@@ -20,13 +20,26 @@ class InvitationMail extends Mailable
 
     public function build(): self
     {
-        $url = route('invitations.show', $this->invitation->token);
+        $this->invitation->loadMissing('invitedBy');
 
-        return $this->subject('You have been invited')
+        $inviteUrl = route('invitations.show', $this->invitation->token);
+        $invitedBy = $this->invitation->invitedBy?->name ?? 'Someone';
+        $expiresAt = $this->invitation->expires_at
+            ? $this->invitation->expires_at->format('F j, Y \a\t g:i A')
+            : 'N/A';
+
+        // Send from the inviter's email so recipients know who invited them
+        $fromEmail = $this->invitation->invitedBy?->email ?? config('mail.from.address');
+        $fromName  = $this->invitation->invitedBy?->name ?? config('mail.from.name');
+
+        return $this->from($fromEmail, $fromName)
+            ->subject("{$invitedBy} invited you to join Iris")
             ->view('emails.invitation')
             ->with([
                 'invitation' => $this->invitation,
-                'url'        => $url,
+                'inviteUrl'  => $inviteUrl,
+                'invitedBy'  => $invitedBy,
+                'expiresAt'  => $expiresAt,
             ]);
     }
 }

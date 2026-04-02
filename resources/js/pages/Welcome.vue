@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { dashboard, login, register } from '@/routes';
+import { ref, onMounted } from 'vue';
 
-withDefaults(
-    defineProps<{
-        canRegister: boolean;
-    }>(),
-    {
-        canRegister: true,
+defineProps({
+    canLogin: {
+        type: Boolean,
+        default: true,
     },
-);
+    canRegister: {
+        type: Boolean,
+        default: true,
+    },
+});
 
 // Theme Toggle Logic
 const isDark = ref(true);
@@ -42,26 +43,29 @@ const toggleTheme = () => {
 </script>
 
 <template>
-    <Head title="Iris - Your images. Crystal clear." />
+    <Head title="Iris - The ultimate home for your visual assets." />
 
-    <!-- Main Wrapper: transitions smoothly between light (slate-50) and dark (#080c18) -->
-    <div class="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-300 dark:bg-[#080c18] dark:text-white overflow-x-hidden font-sans">
+    <!-- Main Wrapper -->
+    <div class="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-300 dark:bg-[#050811] dark:text-white overflow-x-hidden font-sans selection:bg-[#7B2FFF]/30 selection:text-[#7B2FFF] dark:selection:text-[#00E5FF]">
 
         <!-- Navbar -->
-        <header class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 lg:px-12 py-4 backdrop-blur-md border-b border-slate-200/80 bg-white/70 dark:border-white/5 dark:bg-[#080c18]/70 transition-colors duration-300">
-            <!-- Logo: Replaced with favicon.png, made rounded and floating -->
-            <Link href="/" class="flex items-center gap-2 block">
-                <img src="/favicon.png" alt="Iris" class="h-8 w-8 object-cover rounded-full animate-float shadow-md dark:shadow-white/10" />
+        <header class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 lg:px-12 py-4 backdrop-blur-xl border-b border-slate-200/50 bg-white/60 dark:border-white/5 dark:bg-[#050811]/60 transition-colors duration-300">
+            <!-- Brand -->
+            <Link href="/" class="flex items-center gap-3 group">
+                <img src="/favicon.png" alt="Iris Logo" class="h-9 w-9 object-cover rounded-full shadow-md shadow-[#7B2FFF]/20 group-hover:scale-105 transition-transform duration-300" />
+                <span class="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                    Iris
+                </span>
             </Link>
 
-            <nav class="flex items-center gap-1 sm:gap-3">
+            <nav class="flex items-center gap-2 sm:gap-4">
                 <!-- Theme Toggle -->
                 <button 
                     @click="toggleTheme" 
-                    class="p-2 mr-2 rounded-lg text-slate-500 hover:bg-slate-200 dark:text-white/60 dark:hover:bg-white/10 transition-colors focus:outline-none"
+                    class="p-2 mr-1 rounded-full text-slate-500 hover:bg-slate-200/50 dark:text-white/60 dark:hover:bg-white/10 transition-colors focus:outline-none"
                     aria-label="Toggle Dark Mode"
                 >
-                    <!-- Sun Icon (shows in dark mode) -->
+                    <!-- Sun Icon -->
                     <svg v-if="isDark" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="5"></circle>
                         <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -73,221 +77,199 @@ const toggleTheme = () => {
                         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
                         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                     </svg>
-                    <!-- Moon Icon (shows in light mode) -->
+                    <!-- Moon Icon -->
                     <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                     </svg>
                 </button>
 
                 <Link
-                    v-if="$page.props.auth.user"
-                    :href="dashboard()"
-                    class="px-4 py-2 sm:px-5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-white/80 dark:hover:text-white transition-colors"
+                    v-if="$page.props.auth?.user"
+                    href="/dashboard"
+                    class="px-5 py-2.5 rounded-full text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10 transition-colors"
                 >
-                    Dashboard
+                    Go to Dashboard
                 </Link>
                 <template v-else>
                     <Link
-                        :href="login()"
-                        class="hidden sm:inline-block px-5 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-white/60 dark:hover:text-white transition-colors"
+                        v-if="canLogin"
+                        href="/login"
+                        class="hidden sm:inline-block px-5 py-2 rounded-full text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white transition-colors"
                     >
-                        Log in
+                        Sign in
                     </Link>
                     <Link
                         v-if="canRegister"
-                        :href="register()"
-                        class="px-4 py-2 sm:px-5 rounded-lg text-sm font-semibold bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90 transition-opacity"
+                        href="/register"
+                        class="px-5 py-2.5 rounded-full text-sm font-semibold bg-slate-900 text-white dark:bg-white dark:text-[#050811] hover:scale-105 transition-transform shadow-lg shadow-black/10 dark:shadow-white/10"
                     >
-                        Get started
+                        Join Iris
                     </Link>
                 </template>
             </nav>
         </header>
 
-        <!-- Hero -->
-        <section class="relative flex flex-col items-center justify-center min-h-screen px-6 text-center pt-20">
-            <!-- Glows (Subtler in light mode) -->
-            <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-[#7B2FFF]/5 dark:bg-[#7B2FFF]/10 blur-[100px] dark:blur-[130px] pointer-events-none transition-all duration-300" />
-            <div class="absolute top-1/2 left-1/4 w-[400px] h-[400px] rounded-full bg-[#00E5FF]/5 blur-[80px] dark:blur-[100px] pointer-events-none transition-all duration-300" />
-
-            <!-- Logo: Added rounded-full and animate-float -->
-            <div class="relative mb-8">
-                <div class="absolute inset-0 rounded-full bg-gradient-to-br from-[#7B2FFF]/10 to-[#00E5FF]/10 dark:from-[#7B2FFF]/20 dark:to-[#00E5FF]/20 blur-2xl dark:blur-3xl scale-150 transition-all duration-300" />
-                <img src="/favicon.png" alt="Iris" class="relative w-24 h-24 object-cover rounded-full animate-float drop-shadow-xl dark:drop-shadow-2xl" />
-            </div>
-
-            <h1 class="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 max-w-4xl leading-tight text-slate-900 dark:text-white transition-colors duration-300">
-                Your images.
-                <span class="bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] bg-clip-text text-transparent">
-                    Crystal clear.
-                </span>
-            </h1>
-
-            <p class="text-lg text-slate-600 dark:text-white/50 max-w-xl mb-10 leading-relaxed transition-colors duration-300">
-                A powerful image platform built for teams. Upload, organize, share, and collaborate — with privacy and control built in.
-            </p>
-
-            <div class="flex flex-col sm:flex-row items-center gap-4 mb-16">
-                <Link
-                    v-if="canRegister"
-                    :href="register()"
-                    class="px-8 py-3.5 rounded-xl text-base font-semibold bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90 transition-opacity shadow-lg shadow-[#7B2FFF]/25"
-                >
-                    Start for free
-                </Link>
-                <Link
-                    :href="login()"
-                    class="px-8 py-3.5 rounded-xl text-base font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:bg-transparent dark:text-white/60 dark:border-white/10 dark:hover:border-white/20 dark:hover:text-white/80 transition-all shadow-sm dark:shadow-none"
-                >
-                    Sign in
-                </Link>
-            </div>
-
-            <!-- Feature pills -->
-            <div class="flex flex-wrap justify-center gap-2">
-                <span
-                    v-for="feature in ['Drag & Drop Upload', 'Expiring Links', 'EXIF Stripping', 'Team Sharing', 'Storage Limits', 'Dark · Light · System']"
-                    :key="feature"
-                    class="px-4 py-1.5 rounded-full text-xs font-medium text-slate-600 border border-slate-200 bg-white shadow-sm dark:shadow-none dark:text-white/40 dark:border-white/10 dark:bg-white/5 transition-colors duration-300"
-                >
-                    {{ feature }}
-                </span>
-            </div>
-        </section>
-
-        <!-- Dropzone Preview -->
-        <section class="relative px-6 pb-24 flex flex-col items-center">
-            <div class="w-full max-w-3xl rounded-2xl border border-dashed border-[#7B2FFF]/30 bg-white shadow-xl shadow-[#7B2FFF]/5 dark:border-[#7B2FFF]/40 dark:bg-[#0d1220] p-12 flex flex-col items-center gap-4 dark:shadow-[0_0_80px_#7B2FFF15] transition-all duration-300">
-                <!-- Added rounded-full and animate-float -->
-                <img src="/favicon.png" alt="" class="w-14 h-14 object-cover rounded-full animate-float opacity-40 dark:opacity-50 transition-opacity duration-300" />
-                <p class="text-slate-500 dark:text-white/50 text-base transition-colors duration-300">Drag and drop your images here</p>
-                <p class="text-slate-400 dark:text-white/20 text-sm transition-colors duration-300">or</p>
-                <Link
-                    :href="$page.props.auth.user ? dashboard() : register()"
-                    class="px-8 py-3 rounded-xl font-semibold bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90 transition-opacity"
-                >
-                    Upload to Iris
-                </Link>
-            </div>
-        </section>
-
-        <!-- Features -->
-        <section class="px-6 pb-24 max-w-6xl mx-auto">
-            <h2 class="text-3xl font-bold text-center mb-3 text-slate-900 dark:text-white transition-colors duration-300">Everything your team needs</h2>
-            <p class="text-slate-500 dark:text-white/40 text-center mb-12 transition-colors duration-300">Built for teams that care about privacy, speed and simplicity.</p>
+        <!-- Redesigned Hero Section (Split Layout) -->
+        <section class="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden px-6 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16 lg:gap-12 z-10">
             
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <!-- Dynamic Background Glows -->
+            <div class="absolute top-1/2 left-0 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[#7B2FFF]/10 dark:bg-[#7B2FFF]/15 blur-[120px] pointer-events-none -z-10" />
+            <div class="absolute top-1/4 right-0 w-[500px] h-[500px] rounded-full bg-[#00E5FF]/10 dark:bg-[#00E5FF]/15 blur-[100px] pointer-events-none -z-10" />
+
+            <!-- Left Text Content -->
+            <div class="flex-1 text-center lg:text-left z-10 w-full">
+                <!-- Iris Badge -->
+                <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-slate-200 text-slate-700 dark:bg-white/5 dark:border-white/10 dark:text-white/90 text-sm font-semibold mb-8 shadow-sm transition-colors duration-300">
+                    <span class="flex h-2 w-2 rounded-full bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] animate-pulse"></span>
+                    Meet the new Iris Cloud
+                </div>
+
+                <h1 class="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1] text-slate-900 dark:text-white">
+                    Flawless hosting.<br>
+                    Powered by <span class="bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] bg-clip-text text-transparent">Iris.</span>
+                </h1>
+
+                <p class="text-lg sm:text-xl text-slate-600 dark:text-white/60 max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
+                    Transform how your team stores, manages, and distributes visual assets. Iris delivers lightning-fast CDN delivery, bank-level security, and a beautifully intuitive workspace.
+                </p>
+
+                <!-- Actions -->
+                <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12">
+                    <Link
+                        v-if="canRegister"
+                        href="/register"
+                        class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-semibold bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:shadow-lg hover:shadow-[#7B2FFF]/30 hover:-translate-y-0.5 transition-all duration-300"
+                    >
+                        Start using Iris free
+                    </Link>
+                    <Link
+                        v-if="canLogin"
+                        href="/login"
+                        class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:bg-white/5 dark:text-white dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-white/10 transition-all duration-300 shadow-sm"
+                    >
+                        View demo
+                    </Link>
+                </div>
+
+                <!-- Feature Pills -->
+                <div class="flex flex-wrap justify-center lg:justify-start gap-2.5">
+                    <span
+                        v-for="feature in ['Instant CDN', 'Lossless Compression', 'Smart Tags', 'End-to-End Secure']"
+                        :key="feature"
+                        class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-slate-500 bg-slate-100 dark:text-white/50 dark:bg-white/5 transition-colors duration-300"
+                    >
+                        {{ feature }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Right Visual Mockup (Glassmorphism) -->
+            <div class="flex-1 w-full max-w-lg lg:max-w-none relative z-10 animate-float">
+                <div class="absolute inset-0 bg-gradient-to-br from-[#7B2FFF] to-[#00E5FF] rounded-2xl blur-xl opacity-20 dark:opacity-30"></div>
+                <div class="relative rounded-2xl bg-white/60 dark:bg-[#0d1220]/80 border border-white dark:border-white/10 backdrop-blur-xl shadow-2xl p-4 lg:p-6 overflow-hidden">
+                    
+                    <!-- Mac-like Window Controls -->
+                    <div class="flex items-center gap-2 mb-6 px-2">
+                        <div class="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+                        <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+                        <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+                    </div>
+
+                    <!-- Iris App Preview Card -->
+                    <div class="aspect-[4/3] rounded-xl bg-slate-50 dark:bg-[#050811] border border-slate-200 dark:border-white/5 flex flex-col items-center justify-center relative overflow-hidden group">
+                        <!-- Inner Glow -->
+                        <div class="absolute inset-0 bg-gradient-to-t from-[#7B2FFF]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        
+                        <!-- Floating Logo inside mock -->
+                        <div class="relative p-1 rounded-full bg-gradient-to-br from-[#7B2FFF] to-[#00E5FF] mb-6 shadow-xl shadow-[#7B2FFF]/20 animate-float-delayed">
+                            <div class="bg-white dark:bg-[#050811] rounded-full p-2">
+                                <img src="/favicon.png" alt="Iris Node" class="w-16 h-16 object-cover rounded-full" />
+                            </div>
+                        </div>
+
+                        <h3 class="text-2xl font-bold tracking-tight text-slate-800 dark:text-white z-10 mb-1">Iris Engine</h3>
+                        <div class="flex items-center gap-2 z-10">
+                            <span class="relative flex h-2.5 w-2.5">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                            </span>
+                            <p class="text-slate-500 dark:text-white/60 text-sm font-medium">All systems operational</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Grid -->
+        <section class="px-6 pb-24 pt-12 max-w-7xl mx-auto">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-3xl lg:text-4xl font-bold mb-4 text-slate-900 dark:text-white">Built for the modern web</h2>
+                <p class="text-lg text-slate-500 dark:text-white/50">Iris handles the heavy lifting of image hosting so you can focus on building.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div
                     v-for="feature in [
-                        { icon: '⬆️', title: 'Smart Upload', desc: 'Drag & drop, clipboard paste, or URL import. EXIF metadata stripped automatically on upload.' },
-                        { icon: '🔗', title: 'Expiring Links', desc: 'Share images with links that self-destruct after a set time. Full control, always.' },
-                        { icon: '👥', title: 'Team Sharing', desc: 'Create shared folders with view-only or upload-only permissions for guests.' },
-                        { icon: '🔒', title: 'Privacy First', desc: 'Password-protect any image or album. View history shows who accessed what and when.' },
-                        { icon: '📦', title: 'Storage Plans', desc: 'Freemium model with per-user storage limits. Upgrade to Pro or Team when you need more.' },
-                        { icon: '🎨', title: 'Dark · Light · System', desc: 'Fully supports dark, light, and system theme. Looks great on every screen.' },
+                        { icon: '⚡', title: 'Lightning Fast CDN', desc: 'Iris distributes your images across 200+ global edge nodes for millisecond load times.' },
+                        { icon: '🔒', title: 'Granular Privacy', desc: 'Password-protect individual assets, set expiration dates, or enforce team-only access.' },
+                        { icon: '🪄', title: 'Auto-Optimization', desc: 'Upload raw files. Iris automatically compresses and converts them to next-gen WebP formats.' },
+                        { icon: '📂', title: 'Workspace Folders', desc: 'Organize assets into nested folders. Assign specific viewing or editing rights to teammates.' },
+                        { icon: '🛡️', title: 'Data Stripping', desc: 'Keep your location and camera data private. EXIF metadata is instantly scrubbed on upload.' },
+                        { icon: '🎨', title: 'Seamless Integration', desc: 'Copy markdown, HTML, or raw URLs directly from your dashboard with one click.' },
                     ]"
                     :key="feature.title"
-                    class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:border-[#7B2FFF]/40 hover:shadow-md dark:border-white/5 dark:bg-[#0d1220] dark:hover:border-[#7B2FFF]/30 dark:shadow-none transition-all duration-300"
+                    class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm hover:shadow-xl hover:shadow-[#7B2FFF]/5 hover:-translate-y-1 dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-[#7B2FFF]/30 dark:hover:bg-white/[0.04] transition-all duration-300 group"
                 >
-                    <div class="text-2xl mb-3">{{ feature.icon }}</div>
-                    <h3 class="font-semibold text-slate-900 dark:text-white mb-2 transition-colors duration-300">{{ feature.title }}</h3>
-                    <p class="text-sm text-slate-600 dark:text-white/40 leading-relaxed transition-colors duration-300">{{ feature.desc }}</p>
+                    <div class="h-12 w-12 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform duration-300">{{ feature.icon }}</div>
+                    <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-3">{{ feature.title }}</h3>
+                    <p class="text-slate-600 dark:text-white/50 leading-relaxed">{{ feature.desc }}</p>
                 </div>
             </div>
         </section>
 
-        <!-- Pricing -->
-        <section class="px-6 pb-28 max-w-5xl mx-auto text-center">
-            <h2 class="text-3xl font-bold mb-3 text-slate-900 dark:text-white transition-colors duration-300">Simple pricing</h2>
-            <p class="text-slate-500 dark:text-white/40 mb-14 transition-colors duration-300">Start free. Upgrade when you're ready.</p>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <!-- Call to Action -->
+        <section class="px-6 pb-32">
+            <div class="max-w-5xl mx-auto rounded-3xl overflow-hidden relative">
+                <!-- BG Gradients -->
+                <div class="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800 dark:from-[#0d1220] dark:to-[#050811] z-0"></div>
+                <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay z-0"></div>
+                <div class="absolute -top-24 -right-24 w-96 h-96 bg-[#7B2FFF] rounded-full blur-[100px] opacity-40 z-0"></div>
+                <div class="absolute -bottom-24 -left-24 w-96 h-96 bg-[#00E5FF] rounded-full blur-[100px] opacity-30 z-0"></div>
 
-                <!-- Free -->
-                <div class="rounded-2xl border border-slate-200 bg-white p-8 text-left flex flex-col shadow-sm dark:shadow-none dark:border-white/5 dark:bg-[#0d1220] transition-all duration-300">
-                    <p class="text-sm font-medium text-slate-500 dark:text-white/40 mb-2">Free</p>
-                    <p class="text-4xl font-bold mb-1 text-slate-900 dark:text-white">$0</p>
-                    <p class="text-slate-400 dark:text-white/30 text-sm mb-6">Forever free</p>
-                    <ul class="space-y-2.5 text-sm text-slate-600 dark:text-white/50 mb-8 flex-1 transition-colors duration-300">
-                        <li>✓ 1 GB storage</li>
-                        <li>✓ Expiring links</li>
-                        <li>✓ EXIF stripping</li>
-                        <li>✓ Basic sharing</li>
-                    </ul>
-                    <Link :href="register()" class="block text-center px-6 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:bg-transparent dark:border-white/10 dark:text-white/60 dark:hover:border-white/20 dark:hover:text-white transition-all text-sm font-medium">
-                        Get started free
-                    </Link>
-                </div>
-
-                <!-- Pro -->
-                <div class="rounded-2xl border border-[#7B2FFF]/30 bg-gradient-to-br from-[#7B2FFF]/5 to-[#00E5FF]/5 p-8 text-left flex flex-col relative overflow-hidden shadow-md dark:shadow-none dark:border-[#7B2FFF]/40 dark:from-[#7B2FFF]/10 dark:to-[#00E5FF]/5 transition-all duration-300">
-                    <div class="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white">
-                        Popular
-                    </div>
-                    <p class="text-sm font-medium text-slate-600 dark:text-white/40 mb-2 transition-colors duration-300">Pro</p>
-                    <p class="text-4xl font-bold mb-1 text-slate-900 dark:text-white">$9<span class="text-lg text-slate-400 dark:text-white/30 font-normal">/mo</span></p>
-                    <p class="text-slate-500 dark:text-white/30 text-sm mb-6 transition-colors duration-300">Per user</p>
-                    <ul class="space-y-2.5 text-sm text-slate-700 dark:text-white/70 mb-8 flex-1 transition-colors duration-300">
-                        <li class="font-medium">✓ 50 GB storage</li>
-                        <li>✓ Password-protected links</li>
-                        <li>✓ Team folders</li>
-                        <li>✓ View history</li>
-                        <li>✓ Priority support</li>
-                    </ul>
-                    <Link :href="register()" class="block text-center px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90 transition-opacity text-sm font-semibold shadow-md shadow-[#7B2FFF]/20 dark:shadow-none">
-                        Start Pro trial
-                    </Link>
-                </div>
-
-                <!-- Team -->
-                <div class="rounded-2xl border border-slate-200 bg-white p-8 text-left flex flex-col shadow-sm dark:shadow-none dark:border-white/5 dark:bg-[#0d1220] transition-all duration-300">
-                    <p class="text-sm font-medium text-slate-500 dark:text-white/40 mb-2">Team</p>
-                    <p class="text-4xl font-bold mb-1 text-slate-900 dark:text-white">$29<span class="text-lg text-slate-400 dark:text-white/30 font-normal">/mo</span></p>
-                    <p class="text-slate-400 dark:text-white/30 text-sm mb-6">Per workspace</p>
-                    <ul class="space-y-2.5 text-sm text-slate-600 dark:text-white/50 mb-8 flex-1 transition-colors duration-300">
-                        <li>✓ 200 GB storage</li>
-                        <li>✓ Everything in Pro</li>
-                        <li>✓ Admin dashboard</li>
-                        <li>✓ Invite-only registration</li>
-                        <li>✓ Priority support</li>
-                    </ul>
-                    <Link :href="register()" class="block text-center px-6 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:bg-transparent dark:border-white/10 dark:text-white/60 dark:hover:border-white/20 dark:hover:text-white transition-all text-sm font-medium">
-                        Get Team
+                <div class="relative z-10 px-8 py-20 lg:py-24 text-center flex flex-col items-center">
+                    <!-- Footer-style Logo Float -->
+                    <img src="/favicon.png" alt="Iris" class="w-16 h-16 object-cover rounded-full animate-float shadow-2xl shadow-black mb-8 border-2 border-white/10" />
+                    
+                    <h2 class="text-3xl lg:text-5xl font-bold mb-6 text-white tracking-tight">Experience clarity with Iris.</h2>
+                    <p class="text-lg text-white/70 mb-10 max-w-xl mx-auto">
+                        Join thousands of creators, developers, and teams who trust Iris for their daily image operations.
+                    </p>
+                    <Link
+                        v-if="canRegister"
+                        href="/register"
+                        class="px-10 py-4 rounded-xl text-lg font-bold bg-white text-slate-900 hover:bg-slate-100 hover:scale-105 transition-all duration-300 shadow-xl shadow-black/20"
+                    >
+                        Create your free workspace
                     </Link>
                 </div>
             </div>
         </section>
 
-        <!-- CTA -->
-        <section class="px-6 pb-24 text-center">
-            <div class="max-w-2xl mx-auto rounded-2xl border border-slate-200 bg-white px-8 py-14 shadow-lg shadow-slate-200/50 dark:shadow-none dark:border-[#7B2FFF]/20 dark:bg-[#0d1220] dark:bg-gradient-to-br dark:from-[#7B2FFF]/10 dark:to-[#00E5FF]/5 transition-all duration-300">
-                <!-- Added rounded-full and animate-float -->
-                <img src="/favicon.png" alt="Iris" class="w-14 h-14 object-cover rounded-full animate-float mx-auto mb-4 opacity-70 dark:opacity-80 transition-opacity duration-300" />
-                <h2 class="text-3xl font-bold mb-3 text-slate-900 dark:text-white transition-colors duration-300">Ready to get started?</h2>
-                <p class="text-slate-500 dark:text-white/40 mb-8 transition-colors duration-300">Join teams already using Iris to manage their images.</p>
-                <Link
-                    v-if="canRegister"
-                    :href="register()"
-                    class="inline-block px-10 py-3.5 rounded-xl text-base font-semibold bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90 transition-opacity shadow-lg shadow-[#7B2FFF]/25"
-                >
-                    Create free account
-                </Link>
-            </div>
-        </section>
-
-        <!-- Footer -->
-        <footer class="border-t border-slate-200 bg-slate-50 px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 dark:border-white/5 dark:bg-transparent transition-colors duration-300">
-            <div class="flex items-center gap-2">
-                <!-- Replaced with favicon.png, made rounded and floating -->
-                <img src="/favicon.png" alt="Iris" class="h-6 w-6 object-cover rounded-full animate-float opacity-60 dark:opacity-50 transition-opacity duration-300" />
+        <!-- Minimal Footer -->
+        <footer class="border-t border-slate-200 bg-white px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6 dark:border-white/5 dark:bg-[#050811] transition-colors duration-300">
+            <div class="flex items-center gap-3">
+                <img src="/favicon.png" alt="Iris" class="h-6 w-6 object-cover rounded-full grayscale opacity-70 dark:opacity-50" />
+                <span class="font-bold text-slate-700 dark:text-white/70">Iris</span>
             </div>
             
-            <p class="text-slate-400 dark:text-white/20 text-sm transition-colors duration-300">&copy; {{ new Date().getFullYear() }} Iris. All rights reserved.</p>
+            <p class="text-slate-500 dark:text-white/40 text-sm">
+                &copy; {{ new Date().getFullYear() }} Iris Platform. All rights reserved.
+            </p>
             
-            <div class="flex items-center gap-6 text-sm text-slate-500 dark:text-white/30 transition-colors duration-300">
-                <a href="mailto:admin@iris.app" class="hover:text-slate-900 dark:hover:text-white/60 transition-colors">Contact</a>
-                <Link :href="login()" class="hover:text-slate-900 dark:hover:text-white/60 transition-colors">Sign in</Link>
-                <Link v-if="canRegister" :href="register()" class="hover:text-slate-900 dark:hover:text-white/60 transition-colors">Register</Link>
+            <div class="flex items-center gap-8 text-sm font-medium text-slate-600 dark:text-white/50">
+                <a href="#" class="hover:text-[#7B2FFF] dark:hover:text-white transition-colors">Privacy</a>
+                <a href="#" class="hover:text-[#7B2FFF] dark:hover:text-white transition-colors">Terms</a>
+                <Link href="/login" class="hover:text-[#7B2FFF] dark:hover:text-white transition-colors">Sign in</Link>
             </div>
         </footer>
 
@@ -295,20 +277,26 @@ const toggleTheme = () => {
 </template>
 
 <style scoped>
-/* Custom floating animation for the favicon */
+/* Base floating animation */
 @keyframes float {
-    0% {
-        transform: translateY(0px);
-    }
-    50% {
-        transform: translateY(-8px);
-    }
-    100% {
-        transform: translateY(0px);
-    }
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-12px); }
+    100% { transform: translateY(0px); }
+}
+
+/* Delayed floating animation for nested elements */
+@keyframes float-delayed {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+    100% { transform: translateY(0px); }
 }
 
 .animate-float {
-    animation: float 3s ease-in-out infinite;
+    animation: float 4s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+    animation: float-delayed 5s ease-in-out infinite;
+    animation-delay: 1s;
 }
 </style>

@@ -5,19 +5,16 @@ use App\Http\Controllers\ImageController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SharedLinkController;
+use App\Http\Controllers\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
+
+// ======== PUBLIC ROUTES ========
 
 // Landing page
 Route::inertia('/', 'Welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
-
-// Invite-only registration
-Route::get('/register/invite/{token}', [InvitationController::class, 'show'])
-    ->name('invitations.register');
-Route::post('/register/invite/{token}', [InvitationController::class, 'accept'])
-    ->name('invitations.accept');
 
 // Shared link (public - no auth needed)
 Route::get('/share/{token}', [SharedLinkController::class, 'show'])
@@ -25,7 +22,12 @@ Route::get('/share/{token}', [SharedLinkController::class, 'show'])
 Route::post('/share/{token}', [SharedLinkController::class, 'verify'])
     ->name('shared-links.verify');
 
-// Authenticated routes
+// Stripe webhook (must be outside auth + CSRF middleware)
+Route::post('/stripe/webhook', [StripeWebhookController::class, 'handleWebhook'])
+    ->name('cashier.webhook');
+
+
+// ======== AUTHENTICATED ROUTES ========
 Route::middleware(['auth', 'verified'])->group(function () {
 
     // Dashboard
@@ -59,37 +61,44 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('shared-links.destroy');
 
     // Invitations
-    // Protected routes for admins / inviter
-    Route::middleware(['auth'])->group(function () {
     Route::get('/invitations', [InvitationController::class, 'index'])
         ->name('invitations.index');
-
     Route::get('/invitations/create', [InvitationController::class, 'create'])
         ->name('invitations.create');
-
     Route::post('/invitations', [InvitationController::class, 'store'])
         ->name('invitations.store');
-    });
-
-    // Public routes for invitees
-    Route::get('/invitations/{token}', [InvitationController::class, 'show'])
-    ->name('invitations.show');
-
-    Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])
-    ->name('invitations.accept');
+    Route::delete('/invitations/{invitation}', [InvitationController::class, 'destroy'])
+        ->name('invitations.destroy');
 
     // Plans
     Route::get('/plans', [PlanController::class, 'index'])
         ->name('plans.index');
-    Route::get('/plans/{plan}/edit', [PlanController::class, 'edit'])->name('plans.edit');
-    Route::post('/plans', [PlanController::class, 'store'])->name('plans.store');
-    Route::put('/plans/{plan}', [PlanController::class, 'update'])->name('plans.update');
-    Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
+    Route::get('/plans/create', [PlanController::class, 'create'])
+        ->name('plans.create');
+    Route::post('/plans', [PlanController::class, 'store'])
+        ->name('plans.store');
+    Route::get('/plans/{plan}/edit', [PlanController::class, 'edit'])
+        ->name('plans.edit');
+    Route::put('/plans/{plan}', [PlanController::class, 'update'])
+        ->name('plans.update');
+    Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])
+        ->name('plans.destroy');
+
+    // Stripe checkout & billing portal
+    Route::post('/plans/{plan}/checkout', [PlanController::class, 'checkout'])
+        ->name('plans.checkout');
+    Route::post('/plans/portal', [PlanController::class, 'portal'])
+        ->name('plans.portal');
 
 });
 
-// Settings
+// Settings & Admin
 require __DIR__.'/settings.php';
-
-// Admin routes
 require __DIR__.'/admin.php';
+
+// ======== PUBLIC INVITATION ROUTES ========
+// Defined LAST so wildcard {token} never conflicts with /invitations/create above
+Route::get('/invitations/{token}', [InvitationController::class, 'show'])
+    ->name('invitations.show');
+Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])
+    ->name('invitations.accept');

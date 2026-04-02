@@ -1,5 +1,8 @@
 <script setup>
 import { Head, useForm } from '@inertiajs/vue3';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 const props = defineProps({
   invitation: Object,
@@ -15,77 +18,105 @@ const form = useForm({
 <template>
   <Head title="Accept Invitation" />
 
-  <div class="max-w-md mx-auto py-8">
-    <h1 class="text-2xl font-bold mb-4">Accept Invitation</h1>
+  <div class="min-h-screen bg-background flex items-center justify-center px-4">
+    <div class="w-full max-w-md">
 
-    <div class="mb-6 bg-white shadow rounded p-4">
-      <p class="text-sm text-gray-700">
-        You are accepting an invitation for:
-        <strong>{{ invitation.email }}</strong>
-      </p>
-      <p class="text-sm text-gray-500 mt-2">
-        Invited by:
-        <strong>{{ invitation.invitedBy?.name ?? 'Unknown' }}</strong>
-      </p>
-      <p class="text-sm text-gray-500">
-        Status: <strong>{{ invitation.status }}</strong>
-      </p>
-      <p class="text-sm text-gray-500" v-if="invitation.expiresAt">
-        Expires at:
-        <strong>{{ new Date(invitation.expiresAt).toLocaleString() }}</strong>
-      </p>
-    </div>
+      <!-- Logo / Brand -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center size-14 rounded-2xl bg-gradient-to-br from-[#7B2FFF] to-[#00E5FF] mb-4 shadow-lg">
+          <img src="/favicon.png" alt="Iris" class="size-8 object-contain" />
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight">You're invited to Iris</h1>
+        <p class="text-sm text-muted-foreground mt-1">
+          Create your account to get started
+        </p>
+      </div>
 
-    <form
-      @submit.prevent="form.post(route('invitations.accept', invitation.token))"
-      class="space-y-4 bg-white shadow rounded p-4"
-    >
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Name</label>
-        <input
-          v-model="form.name"
-          type="text"
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-        />
-        <div v-if="form.errors.name" class="mt-1 text-sm text-red-600">
-          {{ form.errors.name }}
+      <!-- Invitation Info Card -->
+      <div class="rounded-xl border border-border bg-muted/40 px-5 py-4 mb-6 space-y-1.5">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-muted-foreground">Email:</span>
+          <span class="font-medium">{{ invitation.data?.email ?? invitation.email }}</span>
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-muted-foreground">Invited by:</span>
+          <span class="font-medium">{{ invitation.data?.invitedBy?.name ?? invitation.invitedBy?.name ?? 'Unknown' }}</span>
+        </div>
+        <div class="flex items-center gap-2 text-sm" v-if="invitation.data?.expiresAt ?? invitation.expiresAt">
+          <span class="text-muted-foreground">Expires:</span>
+          <span class="font-medium">
+            {{ new Date(invitation.data?.expiresAt ?? invitation.expiresAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) }}
+          </span>
         </div>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Password</label>
-        <input
-          v-model="form.password"
-          type="password"
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-        />
-        <div v-if="form.errors.password" class="mt-1 text-sm text-red-600">
-          {{ form.errors.password }}
-        </div>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Confirm Password</label>
-        <input
-          v-model="form.password_confirmation"
-          type="password"
-          class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-        />
-        <div v-if="form.errors.password_confirmation" class="mt-1 text-sm text-red-600">
-          {{ form.errors.password_confirmation }}
-        </div>
-      </div>
-
-      <div class="flex justify-end">
-        <button
-          type="submit"
-          class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          :disabled="form.processing"
+      <!-- Form -->
+      <div class="rounded-xl border border-border bg-card p-6 shadow-sm">
+        <form
+          @submit.prevent="form.post(`/invitations/${invitation.data?.token ?? invitation.token}/accept`)"
+          class="space-y-5"
         >
-          <span v-if="form.processing">Creating account...</span>
-          <span v-else>Accept Invitation</span>
-        </button>
+          <div class="space-y-1.5">
+            <Label for="name">Full Name</Label>
+            <Input
+              id="name"
+              v-model="form.name"
+              type="text"
+              placeholder="Jane Doe"
+              :class="{ 'border-destructive': form.errors.name }"
+              autofocus
+              required
+            />
+            <p v-if="form.errors.name" class="text-sm text-destructive">
+              {{ form.errors.name }}
+            </p>
+          </div>
+
+          <div class="space-y-1.5">
+            <Label for="password">Password</Label>
+            <Input
+              id="password"
+              v-model="form.password"
+              type="password"
+              placeholder="••••••••"
+              :class="{ 'border-destructive': form.errors.password }"
+              required
+            />
+            <p v-if="form.errors.password" class="text-sm text-destructive">
+              {{ form.errors.password }}
+            </p>
+          </div>
+
+          <div class="space-y-1.5">
+            <Label for="password_confirmation">Confirm Password</Label>
+            <Input
+              id="password_confirmation"
+              v-model="form.password_confirmation"
+              type="password"
+              placeholder="••••••••"
+              :class="{ 'border-destructive': form.errors.password_confirmation }"
+              required
+            />
+            <p v-if="form.errors.password_confirmation" class="text-sm text-destructive">
+              {{ form.errors.password_confirmation }}
+            </p>
+          </div>
+
+          <Button
+            type="submit"
+            :disabled="form.processing"
+            class="w-full bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90"
+          >
+            {{ form.processing ? 'Creating account...' : 'Accept Invitation' }}
+          </Button>
+        </form>
       </div>
-    </form>
+
+      <p class="text-center text-xs text-muted-foreground mt-6">
+        Already have an account?
+        <a href="/login" class="text-primary hover:underline">Sign in</a>
+      </p>
+
+    </div>
   </div>
 </template>

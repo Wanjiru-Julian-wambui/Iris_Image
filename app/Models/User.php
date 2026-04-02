@@ -8,17 +8,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Cashier\Billable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, Billable;
 
     protected $fillable = [
         'name',
         'email',
         'password',
+        'avatar',
         'plan_id',
         'is_admin',
         'storage_used',
@@ -97,23 +99,23 @@ class User extends Authenticatable
 
     public function getStoragePercentAttribute(): float
     {
-        // 1. Get the limit and ensure it's treated as an integer
         $limit = (int) ($this->plan?->storage_limit ?? config('iris.plans.free.storage_limit', 0));
 
-        // 2. If the limit is 0, we can't divide. 
-        // Return 100 (full) or 0 (empty) based on your preference.
         if ($limit <= 0) {
-            return 0.00; 
+            return 0.00;
         }
 
-        // 3. Perform the calculation safely
         $used = $this->storage_used ?? 0;
-    
+
         return round(($used / $limit) * 100, 2);
     }
 
     public function getAvatarUrlAttribute(): string
     {
+        if ($this->avatar) {
+            return asset('storage/' . $this->avatar);
+        }
+
         return 'https://ui-avatars.com/api/?name=' . urlencode($this->name)
             . '&background=7B2FFF&color=fff&bold=true';
     }

@@ -24,6 +24,7 @@ class PlanResource extends JsonResource
             'features'            => $this->features ?? [],
             'is_active'           => $this->is_active,
             'is_free'             => $this->is_free,
+            'stripe_price_id'     => $this->stripe_price_id,
             'created_at'          => $this->created_at?->toDateTimeString(),
         ];
     }

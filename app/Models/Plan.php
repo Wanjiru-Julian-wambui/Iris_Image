@@ -14,6 +14,7 @@ class Plan extends Model
         'storage_limit',
         'features',
         'is_active',
+        'stripe_price_id',
     ];
 
     protected $casts = [

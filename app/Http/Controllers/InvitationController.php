@@ -8,6 +8,7 @@ use App\Http\Resources\InvitationResource;
 use App\Mail\InvitationMail;
 use App\Models\Invitation;
 use App\Models\User;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -17,11 +18,7 @@ use Inertia\Response;
 
 class InvitationController extends Controller
 {
-    public function __construct()
-    {
-        // Example: require auth for sending invitations
-        $this->middleware('auth')->only(['create', 'store', 'index']);
-    }
+    use AuthorizesRequests;
 
     public function index(): Response
     {
@@ -31,7 +28,7 @@ class InvitationController extends Controller
             ->latest()
             ->paginate(10);
 
-        return Inertia::render('Invitations/Index', [
+        return Inertia::render('invitations/Index', [
             'invitations' => InvitationResource::collection($invitations),
         ]);
     }
@@ -40,7 +37,7 @@ class InvitationController extends Controller
     {
         $this->authorize('create', Invitation::class);
 
-        return Inertia::render('Invitations/Send');
+        return Inertia::render('invitations/Create');
     }
 
     public function store(SendInvitationRequest $request): RedirectResponse
@@ -65,7 +62,7 @@ class InvitationController extends Controller
             ->pending()
             ->firstOrFail();
 
-        return Inertia::render('Auth/AcceptInvitation', [
+        return Inertia::render('auth/AcceptInvitation', [
             'invitation' => InvitationResource::make($invitation),
         ]);
     }
@@ -99,4 +96,11 @@ class InvitationController extends Controller
 
         return redirect()->route('dashboard');
     }
+
+    public function destroy(Invitation $invitation): RedirectResponse
+{
+    $this->authorize('delete', $invitation);
+    $invitation->delete();
+    return back()->with('success', 'Invitation deleted.');
+}
 }

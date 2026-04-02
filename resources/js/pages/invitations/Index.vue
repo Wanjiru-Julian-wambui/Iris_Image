@@ -1,80 +1,179 @@
-<script setup>
-import { Head, Link } from '@inertiajs/vue3';
+<script setup lang="ts">
+import { Head, Link, router } from '@inertiajs/vue3';
+import { Plus, Trash2 } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import AppLayout from '@/layouts/AppLayout.vue';
+import type { BreadcrumbItem } from '@/types';
 
-const props = defineProps({
-  invitations: Object, // pagination resource
-});
+const props = defineProps<{
+    invitations: {
+        data: Array<{
+            id: number;
+            email: string;
+            status: 'pending' | 'accepted' | 'expired';
+            expiresAt: string | null;
+            invitedBy: { name: string } | null;
+        }>;
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+        meta: { current_page: number; last_page: number; total: number };
+    };
+}>();
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'Invitations', href: '/invitations' },
+];
+
+const statusVariant = (status: string) => {
+    if (status === 'accepted') return 'default';
+    if (status === 'expired') return 'destructive';
+    return 'secondary';
+};
+
+const confirmDelete = ref<{ id: number; email: string } | null>(null);
+const deleting = ref(false);
+
+function openDelete(inv: { id: number; email: string }) {
+    confirmDelete.value = inv;
+}
+
+function cancelDelete() {
+    confirmDelete.value = null;
+}
+
+function deleteInvitation() {
+    if (!confirmDelete.value) return;
+    deleting.value = true;
+    router.delete(`/invitations/${confirmDelete.value.id}`, {
+        onFinish: () => {
+            deleting.value = false;
+            confirmDelete.value = null;
+        },
+    });
+}
 </script>
 
 <template>
-  <Head title="Invitations" />
+    <AppLayout :breadcrumbs="breadcrumbs">
+        <Head title="Invitations" />
 
-  <div class="max-w-4xl mx-auto py-8">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold">Invitations</h1>
-      <Link
-        :href="route('invitations.create')"
-        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-      >
-        Send Invitation
-      </Link>
-    </div>
+        <div class="px-4 py-6 md:px-8">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">Invitations</h1>
+                    <p class="text-sm text-muted-foreground mt-1">
+                        {{ invitations.meta.total }} invitation{{ invitations.meta.total !== 1 ? 's' : '' }} total
+                    </p>
+                </div>
+                <Link href="/invitations/create">
+                    <Button class="gap-2 bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90">
+                        <Plus class="h-4 w-4" />
+                        Send Invitation
+                    </Button>
+                </Link>
+            </div>
 
-    <div class="bg-white shadow rounded overflow-hidden">
-      <table class="min-w-full">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Invited By</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200">
-          <tr v-for="inv in invitations.data" :key="inv.id">
-            <td class="px-4 py-2 text-sm text-gray-900">
-              {{ inv.email }}
-            </td>
-            <td class="px-4 py-2 text-sm">
-              <span
-                class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                :class="{
-                  'bg-yellow-100 text-yellow-800': inv.status === 'pending',
-                  'bg-green-100 text-green-800': inv.status === 'accepted',
-                  'bg-red-100 text-red-800': inv.status === 'expired',
-                }"
-              >
-                {{ inv.status }}
-              </span>
-            </td>
-            <td class="px-4 py-2 text-sm text-gray-500">
-              {{ inv.expiresAt ? new Date(inv.expiresAt).toLocaleString() : '-' }}
-            </td>
-            <td class="px-4 py-2 text-sm text-gray-500">
-              {{ inv.invitedBy?.name ?? '-' }}
-            </td>
-          </tr>
-          <tr v-if="!invitations.data.length">
-            <td colspan="4" class="px-4 py-4 text-center text-sm text-gray-500">
-              No invitations found.
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            <!-- Empty state -->
+            <div
+                v-if="invitations.data.length === 0"
+                class="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-24 text-center"
+            >
+                <h3 class="text-lg font-semibold mb-1">No invitations yet</h3>
+                <p class="text-sm text-muted-foreground mb-6 max-w-xs">
+                    Invite someone to join your workspace.
+                </p>
+                <Link href="/invitations/create">
+                    <Button class="gap-2 bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90">
+                        <Plus class="h-4 w-4" />
+                        Send Invitation
+                    </Button>
+                </Link>
+            </div>
 
-    <!-- Simple pagination example -->
-    <div class="mt-4 flex justify-between" v-if="invitations.links?.length">
-      <div v-for="link in invitations.links" :key="link.url" class="mr-2">
-        <Link
-          v-if="link.url"
-          :href="link.url"
-          class="px-3 py-1 text-sm rounded"
-          :class="link.active ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'"
-          v-html="link.label"
-        />
-        <span v-else class="px-3 py-1 text-sm text-gray-400" v-html="link.label" />
-      </div>
-    </div>
-  </div>
+            <!-- Table -->
+            <div v-else class="rounded-xl border border-border overflow-hidden">
+                <table class="min-w-full divide-y divide-border">
+                    <thead class="bg-muted">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Email</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Expires</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Invited By</th>
+                            <th class="px-4 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        <tr v-for="inv in invitations.data" :key="inv.id" class="hover:bg-muted/50 transition-colors">
+                            <td class="px-4 py-3 text-sm">{{ inv.email }}</td>
+                            <td class="px-4 py-3 text-sm">
+                                <Badge :variant="statusVariant(inv.status)" class="capitalize">
+                                    {{ inv.status }}
+                                </Badge>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-muted-foreground">
+                                {{ inv.expiresAt ? new Date(inv.expiresAt).toLocaleString() : '-' }}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-muted-foreground">
+                                {{ inv.invitedBy?.name ?? '-' }}
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <button
+                                    @click="openDelete(inv)"
+                                    class="flex size-7 items-center justify-center rounded-full bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-colors"
+                                >
+                                    <Trash2 class="h-3.5 w-3.5" />
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div v-if="invitations.meta.last_page > 1" class="flex justify-center gap-2 mt-8">
+                <template v-for="link in invitations.links" :key="link.label">
+                    <Link v-if="link.url" :href="link.url">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            :class="link.active ? 'bg-primary text-primary-foreground' : ''"
+                            v-html="link.label"
+                        />
+                    </Link>
+                    <Button v-else variant="ghost" size="sm" disabled v-html="link.label" />
+                </template>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Dialog -->
+        <Dialog :open="!!confirmDelete" @update:open="cancelDelete">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Delete invitation</DialogTitle>
+                    <DialogDescription>
+                        Are you sure you want to delete the invitation for
+                        <strong>{{ confirmDelete?.email }}</strong>?
+                        This action cannot be undone.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" @click="cancelDelete">Cancel</Button>
+                    <Button variant="destructive" :disabled="deleting" @click="deleteInvitation">
+                        {{ deleting ? 'Deleting...' : 'Delete' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    </AppLayout>
 </template>
