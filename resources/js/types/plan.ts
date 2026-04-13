@@ -9,7 +9,6 @@ export interface Plan {
     features: string[];
     is_active: boolean;
     is_free: boolean;
-    stripe_price_id: string | null;
     created_at: string | null;
 }
 

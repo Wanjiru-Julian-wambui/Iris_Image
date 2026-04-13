@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { Check, Loader2 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { Check } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Plan } from '@/types/plan';
@@ -10,20 +9,10 @@ const props = defineProps<{
     plan: Plan;
     currentPlan: Plan | null;
     isPopular?: boolean;
+    paypalReady?: boolean;
 }>();
 
-const emit = defineEmits<{
-    (e: 'subscribe', plan: Plan): void;
-}>();
-
-const loading = ref(false);
 const isCurrentPlan = props.currentPlan?.id === props.plan.id;
-
-function handleSubscribe() {
-    if (isCurrentPlan || props.plan.is_free) return;
-    loading.value = true;
-    emit('subscribe', props.plan);
-}
 </script>
 
 <template>
@@ -77,17 +66,17 @@ function handleSubscribe() {
         <Button v-if="isCurrentPlan" disabled variant="outline" class="w-full">
             Current plan
         </Button>
-        <Button v-else-if="plan.is_free" variant="outline" class="w-full" disabled>
+
+        <Button v-else-if="plan.is_free" disabled variant="outline" class="w-full">
             Free plan
         </Button>
-        <Button
-            v-else
-            class="w-full text-white hover:opacity-90 bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF]"
-            :disabled="loading"
-            @click="handleSubscribe"
-        >
-            <Loader2 v-if="loading" class="h-4 w-4 animate-spin mr-2" />
-            {{ loading ? 'Redirecting to Stripe...' : `Upgrade to ${plan.name}` }}
-        </Button>
+
+        <!-- PayPal button is mounted here by the parent page via onMounted -->
+        <div v-else>
+            <div :id="`paypal-button-${plan.id}`" class="min-h-[44px]" />
+            <p v-if="!paypalReady" class="text-xs text-center text-muted-foreground mt-2">
+                Loading PayPal…
+            </p>
+        </div>
     </div>
 </template>

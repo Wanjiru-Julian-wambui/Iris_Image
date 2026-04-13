@@ -9,10 +9,11 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import InputError from '@/components/InputError.vue';
 import type { BreadcrumbItem } from '@/types';
+import { allFeatures } from '@/types/plan';
+import type { Plan } from '@/types/plan';
 
 const props = defineProps<{
-    
-    plan: App.PlanResource; 
+    plan: Plan;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -21,25 +22,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: `Edit ${props.plan.name}`, href: `/plans/${props.plan.id}/edit` },
 ];
 
-const allFeatures = [
-    { value: 'expiring_links',           label: 'Expiring links' },
-    { value: 'exif_stripping',           label: 'EXIF stripping' },
-    { value: 'basic_sharing',            label: 'Basic sharing' },
-    { value: 'password_protected_links', label: 'Password-protected links' },
-    { value: 'team_folders',             label: 'Team folders' },
-    { value: 'view_history',             label: 'View history' },
-    { value: 'admin_dashboard',          label: 'Admin dashboard' },
-    { value: 'invite_only_registration', label: 'Invite-only registration' },
-    { value: 'priority_support',         label: 'Priority support' },
-];
-
 const form = useForm({
-    name:       props.plan.name,
-    slug:       props.plan.slug,
-    price:      props.plan.price,
-    storage_gb: Math.round(props.plan.storage_limit / (1024 * 1024 * 1024)),
-    features:   [...(props.plan.features ?? [])] as string[],
-    is_active:  props.plan.is_active,
+    name:          props.plan.name,
+    slug:          props.plan.slug,
+    price:         props.plan.price,
+    storage_gb:    Math.round(props.plan.storage_limit / (1024 * 1024 * 1024)),
+    features:      [...(props.plan.features ?? [])] as string[],
+    is_active:     props.plan.is_active,
 });
 
 function submit() {
@@ -53,6 +42,7 @@ function submit() {
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`Edit ${plan.name}`" />
+
         <div class="max-w-2xl mx-auto px-4 py-8">
             <div class="flex items-center gap-3 mb-6">
                 <Link href="/plans">
@@ -64,6 +54,8 @@ function submit() {
             </div>
 
             <form @submit.prevent="submit" class="space-y-6">
+
+                <!-- Basic Info -->
                 <div class="rounded-xl border border-border p-6 space-y-4">
                     <h2 class="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Basic info</h2>
                     <div class="grid grid-cols-2 gap-4">
@@ -96,17 +88,23 @@ function submit() {
                     </div>
                 </div>
 
+                <!-- Features -->
                 <div class="rounded-xl border border-border p-6 space-y-3">
                     <h2 class="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-2">Features</h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <label v-for="feature in allFeatures" :key="feature.value" 
+                        <label
+                            v-for="feature in allFeatures"
+                            :key="feature.value"
                             class="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                            :class="form.features.includes(feature.value) ? 'border-[#7B2FFF]/40 bg-[#7B2FFF]/5' : ''">
-                            <Checkbox :checked="form.features.includes(feature.value)"
+                            :class="form.features.includes(feature.value) ? 'border-[#7B2FFF]/40 bg-[#7B2FFF]/5' : ''"
+                        >
+                            <Checkbox
+                                :checked="form.features.includes(feature.value)"
                                 @update:checked="(checked) => {
                                     if (checked) form.features.push(feature.value);
                                     else form.features = form.features.filter(f => f !== feature.value);
-                                }" />
+                                }"
+                            />
                             <span class="text-sm">{{ feature.label }}</span>
                         </label>
                     </div>
@@ -117,7 +115,11 @@ function submit() {
                     <Link href="/plans" class="flex-1">
                         <Button type="button" variant="outline" class="w-full">Cancel</Button>
                     </Link>
-                    <Button type="submit" class="flex-1 bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white" :disabled="form.processing">
+                    <Button
+                        type="submit"
+                        class="flex-1 bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white"
+                        :disabled="form.processing"
+                    >
                         {{ form.processing ? 'Saving...' : 'Save changes' }}
                     </Button>
                 </div>

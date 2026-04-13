@@ -12,8 +12,8 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
-            $table->unsignedInteger('price')->default(0);
-            $table->unsignedBigInteger('storage_limit');
+            $table->unsignedInteger('price')->default(0);       // whole dollars
+            $table->unsignedBigInteger('storage_limit');        // bytes
             $table->json('features')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();

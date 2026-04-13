@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import InputError from '@/components/InputError.vue';
 import type { BreadcrumbItem } from '@/types';
+import { allFeatures } from '@/types/plan';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -16,25 +17,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'New plan', href: '/plans/create' },
 ];
 
-const allFeatures = [
-    { value: 'expiring_links',           label: 'Expiring links' },
-    { value: 'exif_stripping',           label: 'EXIF stripping' },
-    { value: 'basic_sharing',            label: 'Basic sharing' },
-    { value: 'password_protected_links', label: 'Password-protected links' },
-    { value: 'team_folders',             label: 'Team folders' },
-    { value: 'view_history',             label: 'View history' },
-    { value: 'admin_dashboard',          label: 'Admin dashboard' },
-    { value: 'invite_only_registration', label: 'Invite-only registration' },
-    { value: 'priority_support',         label: 'Priority support' },
-];
-
 const form = useForm({
-    name:          '',
-    slug:          '',
-    price:         0,
-    storage_gb:    1,
-    features:      [] as string[],
-    is_active:     true,
+    name:       '',
+    slug:       '',
+    price:      0,
+    storage_gb: 1,
+    features:   [] as string[],
+    is_active:  true,
 });
 
 function autoSlug() {
@@ -52,6 +41,7 @@ function submit() {
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="New Plan" />
+
         <div class="max-w-2xl mx-auto px-4 py-8">
             <div class="flex items-center gap-3 mb-6">
                 <Link href="/plans">
@@ -98,21 +88,30 @@ function submit() {
                 <div class="rounded-xl border border-border p-6 space-y-3">
                     <h2 class="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-2">Features</h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <label v-for="feature in allFeatures" :key="feature.value" 
+                        <label
+                            v-for="feature in allFeatures"
+                            :key="feature.value"
                             class="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                            :class="form.features.includes(feature.value) ? 'border-[#7B2FFF]/40 bg-[#7B2FFF]/5' : ''">
-                            <Checkbox :checked="form.features.includes(feature.value)"
+                            :class="form.features.includes(feature.value) ? 'border-[#7B2FFF]/40 bg-[#7B2FFF]/5' : ''"
+                        >
+                            <Checkbox
+                                :checked="form.features.includes(feature.value)"
                                 @update:checked="(checked) => {
                                     if (checked) form.features.push(feature.value);
                                     else form.features = form.features.filter(f => f !== feature.value);
-                                }" />
+                                }"
+                            />
                             <span class="text-sm">{{ feature.label }}</span>
                         </label>
                     </div>
                     <InputError :message="form.errors.features" />
                 </div>
 
-                <Button type="submit" class="w-full bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white" :disabled="form.processing">
+                <Button
+                    type="submit"
+                    class="w-full bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white"
+                    :disabled="form.processing"
+                >
                     {{ form.processing ? 'Creating...' : 'Create plan' }}
                 </Button>
             </form>
