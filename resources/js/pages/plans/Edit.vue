@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ArrowLeft } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
-import InputError from '@/components/InputError.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { allFeatures } from '@/types/plan';
 import type { Plan } from '@/types/plan';
@@ -18,17 +18,17 @@ const props = defineProps<{
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Plans', href: '/plans' },
+    { title: 'Plans',     href: '/plans' },
     { title: `Edit ${props.plan.name}`, href: `/plans/${props.plan.id}/edit` },
 ];
 
 const form = useForm({
-    name:          props.plan.name,
-    slug:          props.plan.slug,
-    price:         props.plan.price,
-    storage_gb:    Math.round(props.plan.storage_limit / (1024 * 1024 * 1024)),
-    features:      [...(props.plan.features ?? [])] as string[],
-    is_active:     props.plan.is_active,
+    name:       props.plan.name,
+    slug:       props.plan.slug,
+    price:      props.plan.price,
+    storage_gb: Math.round(props.plan.storage_limit / (1024 * 1024 * 1024)),
+    features:   [...(props.plan.features ?? [])] as string[],
+    is_active:  props.plan.is_active,
 });
 
 function submit() {
@@ -55,7 +55,6 @@ function submit() {
 
             <form @submit.prevent="submit" class="space-y-6">
 
-                <!-- Basic Info -->
                 <div class="rounded-xl border border-border p-6 space-y-4">
                     <h2 class="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Basic info</h2>
                     <div class="grid grid-cols-2 gap-4">
@@ -72,14 +71,14 @@ function submit() {
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-1.5">
-                            <Label for="price">Price (USD/month)</Label>
+                            <Label for="price">Price (USD/month, 0 = Free)</Label>
                             <Input id="price" v-model.number="form.price" type="number" min="0" step="1" />
                             <InputError :message="form.errors.price" />
                         </div>
                         <div class="space-y-1.5">
                             <Label for="storage">Storage (GB)</Label>
                             <Input id="storage" v-model.number="form.storage_gb" type="number" min="1" step="1" />
-                            <InputError :message="form.errors.storage_limit" />
+                            <InputError :message="form.errors.storage_gb" />
                         </div>
                     </div>
                     <div class="flex items-center justify-between pt-2">
@@ -88,7 +87,6 @@ function submit() {
                     </div>
                 </div>
 
-                <!-- Features -->
                 <div class="rounded-xl border border-border p-6 space-y-3">
                     <h2 class="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-2">Features</h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -100,7 +98,7 @@ function submit() {
                         >
                             <Checkbox
                                 :checked="form.features.includes(feature.value)"
-                                @update:checked="(checked) => {
+                                @update:checked="(checked: boolean) => {
                                     if (checked) form.features.push(feature.value);
                                     else form.features = form.features.filter(f => f !== feature.value);
                                 }"
@@ -120,7 +118,7 @@ function submit() {
                         class="flex-1 bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white"
                         :disabled="form.processing"
                     >
-                        {{ form.processing ? 'Saving...' : 'Save changes' }}
+                        {{ form.processing ? 'Saving…' : 'Save changes' }}
                     </Button>
                 </div>
             </form>

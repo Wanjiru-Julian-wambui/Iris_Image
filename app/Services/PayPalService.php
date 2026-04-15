@@ -13,7 +13,7 @@ class PayPalService
 
     public function __construct()
     {
-        $this->baseUrl = config('services.paypal.mode') === 'live'
+        $this->baseUrl  = config('services.paypal.mode') === 'live'
             ? 'https://api-m.paypal.com'
             : 'https://api-m.sandbox.paypal.com';
 

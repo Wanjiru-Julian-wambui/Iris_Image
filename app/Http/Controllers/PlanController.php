@@ -11,28 +11,16 @@ use Inertia\Inertia;
 
 class PlanController extends Controller
 {
-    // -----------------------------------------------------------------------
-    // Plan list (inside app, requires plan.selected middleware)
-    // -----------------------------------------------------------------------
-
-    public function index()
-    {
-        $plans = Plan::active()->orderBy('price')->get();
-
-        return Inertia::render('plans/Index', [
-            'plans'       => PlanResource::collection($plans),
-            'currentPlan' => Auth::user()->plan
-                ? new PlanResource(Auth::user()->plan)
-                : null,
-        ]);
-    }
-
-    // -----------------------------------------------------------------------
-    // Post-signup plan chooser (no plan.selected guard)
-    // -----------------------------------------------------------------------
+    /*
+    |--------------------------------------------------------------------------
+    | Post-signup plan chooser
+    | Route: GET /plans/choose  — excluded from plan.selected middleware
+    |--------------------------------------------------------------------------
+    */
 
     public function choose()
     {
+        // Already has a plan → go straight to dashboard
         if (Auth::user()->plan_id) {
             return redirect()->route('dashboard');
         }
@@ -42,10 +30,12 @@ class PlanController extends Controller
         ]);
     }
 
-    /**
-     * Immediately assign the FREE plan.
-     * Paid plans must go through the PayPal checkout/capture flow.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Select free plan immediately (no payment)
+    |--------------------------------------------------------------------------
+    */
+
     public function select(Request $request)
     {
         $request->validate(['plan_id' => 'required|exists:plans,id']);
@@ -61,13 +51,12 @@ class PlanController extends Controller
         return redirect()->route('dashboard');
     }
 
-    // -----------------------------------------------------------------------
-    // PayPal checkout flow
-    // -----------------------------------------------------------------------
+    /*
+    |--------------------------------------------------------------------------
+    | PayPal: create order
+    |--------------------------------------------------------------------------
+    */
 
-    /**
-     * Create a PayPal order and return the order details to the frontend JS.
-     */
     public function checkout(Plan $plan, PayPalService $paypal)
     {
         if ($plan->is_free) {
@@ -79,9 +68,12 @@ class PlanController extends Controller
         return response()->json($order);
     }
 
-    /**
-     * Capture a completed PayPal order and assign the plan to the user.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | PayPal: capture order → assign plan
+    |--------------------------------------------------------------------------
+    */
+
     public function capture(Request $request, Plan $plan, PayPalService $paypal)
     {
         $request->validate(['orderID' => 'required|string']);
@@ -97,9 +89,29 @@ class PlanController extends Controller
         return response()->json(['status' => 'error', 'details' => $result], 422);
     }
 
-    // -----------------------------------------------------------------------
-    // Admin CRUD
-    // -----------------------------------------------------------------------
+    /*
+    |--------------------------------------------------------------------------
+    | In-app plan management (change plan)
+    |--------------------------------------------------------------------------
+    */
+
+    public function index()
+    {
+        $plans = Plan::active()->orderBy('price')->get();
+
+        return Inertia::render('plans/Index', [
+            'plans'       => PlanResource::collection($plans),
+            'currentPlan' => Auth::user()->plan
+                ? new PlanResource(Auth::user()->plan)
+                : null,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin CRUD
+    |--------------------------------------------------------------------------
+    */
 
     public function create()
     {
@@ -150,7 +162,7 @@ class PlanController extends Controller
     public function destroy(Plan $plan)
     {
         if ($plan->users()->exists()) {
-            return back()->withErrors(['error' => 'Cannot delete a plan with active subscribers.']);
+            return back()->withErrors(['error' => 'Cannot delete a plan that has active subscribers.']);
         }
 
         $plan->delete();

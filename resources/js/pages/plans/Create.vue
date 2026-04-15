@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { Head, useForm, Link } from '@inertiajs/vue3';
 import { ArrowLeft } from 'lucide-vue-next';
-import AppLayout from '@/layouts/AppLayout.vue';
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
-import InputError from '@/components/InputError.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { allFeatures } from '@/types/plan';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Plans', href: '/plans' },
-    { title: 'New plan', href: '/plans/create' },
+    { title: 'Plans',     href: '/plans' },
+    { title: 'New plan',  href: '/plans/create' },
 ];
 
 const form = useForm({
@@ -69,14 +69,14 @@ function submit() {
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-1.5">
-                            <Label for="price">Price (USD/month)</Label>
+                            <Label for="price">Price (USD/month, 0 = Free)</Label>
                             <Input id="price" v-model.number="form.price" type="number" min="0" step="1" />
                             <InputError :message="form.errors.price" />
                         </div>
                         <div class="space-y-1.5">
                             <Label for="storage">Storage (GB)</Label>
                             <Input id="storage" v-model.number="form.storage_gb" type="number" min="1" step="1" />
-                            <InputError :message="form.errors.storage_limit" />
+                            <InputError :message="form.errors.storage_gb" />
                         </div>
                     </div>
                     <div class="flex items-center justify-between pt-2">
@@ -96,7 +96,7 @@ function submit() {
                         >
                             <Checkbox
                                 :checked="form.features.includes(feature.value)"
-                                @update:checked="(checked) => {
+                                @update:checked="(checked: boolean) => {
                                     if (checked) form.features.push(feature.value);
                                     else form.features = form.features.filter(f => f !== feature.value);
                                 }"
@@ -112,7 +112,7 @@ function submit() {
                     class="w-full bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white"
                     :disabled="form.processing"
                 >
-                    {{ form.processing ? 'Creating...' : 'Create plan' }}
+                    {{ form.processing ? 'Creating…' : 'Create plan' }}
                 </Button>
             </form>
         </div>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\PlanController;
@@ -8,7 +9,9 @@ use App\Http\Controllers\SharedLinkController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
-// ======== PUBLIC ROUTES ========
+// ============================================================
+// PUBLIC
+// ============================================================
 
 Route::inertia('/', 'Welcome', [
     'canRegister' => Features::enabled(Features::registration()),
@@ -18,42 +21,40 @@ Route::get('/share/{token}',  [SharedLinkController::class, 'show'])->name('shar
 Route::post('/share/{token}', [SharedLinkController::class, 'verify'])->name('shared-links.verify');
 
 
-// ======== AUTHENTICATED ROUTES ========
+// ============================================================
+// AUTHENTICATED
+// ============================================================
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // ----------------------------------------------------------------
-    // Post-signup plan selection — excluded from plan.selected guard
-    // ----------------------------------------------------------------
-    Route::get('/plans/choose',  [PlanController::class, 'choose'])->name('plans.choose');
-    Route::post('/plans/select', [PlanController::class, 'select'])->name('plans.select');
-
-    // PayPal endpoints — outside plan.selected so new users can pay
+    // ----------------------------------------------------------
+    // Plan chooser + PayPal endpoints
+    // Outside plan.selected so brand-new users can reach them.
+    // ----------------------------------------------------------
+    Route::get('/plans/choose',           [PlanController::class, 'choose'])->name('plans.choose');
+    Route::post('/plans/select',          [PlanController::class, 'select'])->name('plans.select');
     Route::post('/plans/{plan}/checkout', [PlanController::class, 'checkout'])->name('plans.checkout');
     Route::post('/plans/{plan}/capture',  [PlanController::class, 'capture'])->name('plans.capture');
 
-    // ----------------------------------------------------------------
-    // Protected app routes — require a plan to be chosen first
-    // ----------------------------------------------------------------
+    // ----------------------------------------------------------
+    // Protected app routes — require a plan to be chosen first.
+    // ----------------------------------------------------------
     Route::middleware('plan.selected')->group(function () {
 
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Images
-        Route::get('/images',         [ImageController::class, 'index'])->name('images.index');
-        Route::get('/images/create',  [ImageController::class, 'create'])->name('images.create');
-        Route::get('/images/{image}', [ImageController::class, 'show'])->name('images.show');
+        // Images — read/delete require plan
+        Route::get('/images',            [ImageController::class, 'index'])->name('images.index');
+        Route::get('/images/create',     [ImageController::class, 'create'])->name('images.create');
+        Route::get('/images/{image}',    [ImageController::class, 'show'])->name('images.show');
         Route::delete('/images/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
-        Route::middleware('storage.limit')->group(function () {
-            Route::post('/images', [ImageController::class, 'store'])->name('images.store');
-        });
 
-        // Gallery
-        Route::inertia('/gallery', 'Gallery')->name('gallery');
+        // Gallery — needs a real controller to pass paginated images + filters
+        Route::get('/gallery', [GalleryController::class, 'index'])->name('gallery');
 
         // Shared links
-        Route::get('/shared-links',              [SharedLinkController::class, 'index'])->name('shared-links.index');
-        Route::post('/shared-links',             [SharedLinkController::class, 'store'])->name('shared-links.store');
+        Route::get('/shared-links',               [SharedLinkController::class, 'index'])->name('shared-links.index');
+        Route::post('/shared-links',              [SharedLinkController::class, 'store'])->name('shared-links.store');
         Route::delete('/shared-links/{sharedLink}', [SharedLinkController::class, 'destroy'])->name('shared-links.destroy');
 
         // Invitations
@@ -62,7 +63,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/invitations',       [InvitationController::class, 'store'])->name('invitations.store');
         Route::delete('/invitations/{invitation}', [InvitationController::class, 'destroy'])->name('invitations.destroy');
 
-        // Plans — manage & admin CRUD
+        // Plans — in-app view & change plan, plus admin CRUD
         Route::get('/plans',             [PlanController::class, 'index'])->name('plans.index');
         Route::get('/plans/create',      [PlanController::class, 'create'])->name('plans.create');
         Route::post('/plans',            [PlanController::class, 'store'])->name('plans.store');
@@ -70,13 +71,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/plans/{plan}',      [PlanController::class, 'update'])->name('plans.update');
         Route::delete('/plans/{plan}',   [PlanController::class, 'destroy'])->name('plans.destroy');
     });
+
+    // Image UPLOAD — auth + storage limit only, never blocked by plan.selected
+    Route::middleware('storage.limit')->group(function () {
+        Route::post('/images', [ImageController::class, 'store'])->name('images.store');
+    });
 });
 
 // Settings & Admin
 require __DIR__.'/settings.php';
 require __DIR__.'/admin.php';
 
-// ======== PUBLIC INVITATION ROUTES ========
+// ============================================================
+// PUBLIC INVITATION ROUTES
 // Defined LAST so {token} wildcard never matches /invitations/create
+// ============================================================
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');

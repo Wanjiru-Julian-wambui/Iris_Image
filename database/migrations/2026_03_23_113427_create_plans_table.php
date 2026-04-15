@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
-            $table->unsignedInteger('price')->default(0);       // whole dollars
+            $table->unsignedInteger('price')->default(0);       // stored in whole dollars
             $table->unsignedBigInteger('storage_limit');        // bytes
             $table->json('features')->nullable();
             $table->boolean('is_active')->default(true);

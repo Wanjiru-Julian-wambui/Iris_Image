@@ -1,6 +1,17 @@
 <script setup lang="ts">
+/**
+ * Choose.vue
+ *
+ * Shown once after signup (before the user reaches the dashboard).
+ * - Free plan  → POST /plans/select → redirect to dashboard, no payment asked.
+ * - Paid plans → PayPal JS SDK buttons.
+ *
+ * The PayPal SDK is loaded in app.blade.php:
+ *   <script src="https://www.paypal.com/sdk/js?client-id=...&currency=USD"><\/script>
+ * so window.paypal is already available when onMounted fires.
+ */
 import { Head, router } from '@inertiajs/vue3';
-import { Check, Loader2 } from 'lucide-vue-next';
+import { Check, Loader2, ShieldCheck } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,69 +23,76 @@ const props = defineProps<{
 }>();
 
 const selecting    = ref<number | null>(null);
-const paypalReady  = ref(false);
 const errorMessage = ref('');
 
+function csrfToken(): string {
+    return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '';
+}
+
 // -----------------------------------------------------------------------
-// Free plan — direct POST
+// Free plan — direct POST, no payment details collected
 // -----------------------------------------------------------------------
 function selectFreePlan(plan: Plan) {
-    if (selecting.value) return;
+    if (selecting.value !== null) {
+        return;
+    }
+
     selecting.value = plan.id;
     router.post('/plans/select', { plan_id: plan.id }, {
-        onFinish: () => { selecting.value = null; },
+        onFinish: () => {
+            selecting.value = null;
+        },
     });
 }
 
 // -----------------------------------------------------------------------
-// PayPal — render a button per paid plan
+// Paid plan — mount a PayPal button per plan card
 // -----------------------------------------------------------------------
 function mountPayPalButton(plan: Plan) {
-    const containerId = `paypal-button-${plan.id}`;
-
-    // @ts-ignore — PayPal SDK loaded via CDN script tag
+    // @ts-expect-error — window.paypal is injected by the SDK <script> in app.blade.php
     window.paypal.Buttons({
-        style: {
-            layout: 'vertical',
-            color:  'blue',
-            shape:  'pill',
-            label:  'pay',
-            height: 40,
-        },
+        style: { layout: 'vertical', color: 'blue', shape: 'pill', label: 'pay', height: 44 },
 
         createOrder: async () => {
             errorMessage.value = '';
             const res = await fetch(`/plans/${plan.id}/checkout`, {
-                method:  'POST',
-                headers: {
-                    'Content-Type':     'application/json',
-                    'X-CSRF-TOKEN':     (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
-                    'Accept':           'application/json',
-                },
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error ?? 'Could not create PayPal order.');
-            return data.id; // PayPal order ID
+
+            if (!res.ok) {
+                throw new Error(data.error ?? 'Could not create PayPal order.');
+            }
+
+            return data.id;
         },
 
         onApprove: async (data: { orderID: string }) => {
             selecting.value = plan.id;
-            const res = await fetch(`/plans/${plan.id}/capture`, {
-                method:  'POST',
-                headers: {
-                    'Content-Type':     'application/json',
-                    'X-CSRF-TOKEN':     (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
-                    'Accept':           'application/json',
-                },
-                body: JSON.stringify({ orderID: data.orderID }),
-            });
-            const result = await res.json();
-            if (result.status === 'success') {
-                router.visit('/dashboard');
-            } else {
-                errorMessage.value = 'Payment was captured but plan assignment failed. Please contact support.';
+
+            try {
+                const res = await fetch(`/plans/${plan.id}/capture`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+                    body: JSON.stringify({ orderID: data.orderID }),
+                });
+                const result = await res.json();
+
+                if (result.status === 'success') {
+                    router.visit('/dashboard');
+                } else {
+                    errorMessage.value = 'Payment captured but plan assignment failed. Please contact support.';
+                    selecting.value = null;
+                }
+            } catch {
+                errorMessage.value = 'Network error during capture. Please contact support.';
                 selecting.value = null;
             }
+        },
+
+        onCancel: () => {
+            errorMessage.value = "Payment cancelled. You can try again whenever you're ready.";
         },
 
         onError: (err: unknown) => {
@@ -82,51 +100,43 @@ function mountPayPalButton(plan: Plan) {
             errorMessage.value = 'Something went wrong with PayPal. Please try again.';
             selecting.value = null;
         },
-    }).render(`#${containerId}`);
+    }).render(`#paypal-btn-${plan.id}`);
 }
 
+// SDK is already on window.paypal — mount buttons straight away
 onMounted(() => {
-    // Load PayPal JS SDK script dynamically
-    const clientId = (document.querySelector('meta[name="paypal-client-id"]') as HTMLMetaElement)?.content;
-    if (!clientId) {
-        console.warn('PayPal client-id meta tag not found. Add <meta name="paypal-client-id" content="..."> to your layout.');
-        return;
-    }
-
-    const script    = document.createElement('script');
-    script.src      = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`;
-    script.onload   = () => {
-        paypalReady.value = true;
-        props.plans.data
-            .filter(p => !p.is_free)
-            .forEach(p => mountPayPalButton(p));
-    };
-    document.head.appendChild(script);
+    props.plans.data
+        .filter(p => !p.is_free)
+        .forEach(p => mountPayPalButton(p));
 });
 </script>
 
 <template>
     <Head title="Choose a Plan" />
 
-    <div class="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
+    <div class="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-16">
 
-        <!-- Brand -->
-        <div class="text-center mb-10">
-            <div class="inline-flex items-center justify-center size-14 rounded-2xl bg-gradient-to-br from-[#7B2FFF] to-[#00E5FF] mb-4 shadow-lg">
-                <img src="/favicon.png" alt="Logo" class="size-8 object-contain" />
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <div class="inline-flex items-center justify-center size-16 rounded-2xl bg-gradient-to-br from-[#7B2FFF] to-[#00E5FF] mb-5 shadow-lg">
+                <img src="/favicon.png" alt="Logo" class="size-9 object-contain" />
             </div>
             <h1 class="text-3xl font-bold tracking-tight">Choose your plan</h1>
-            <p class="text-muted-foreground mt-2 max-w-sm mx-auto">
-                Start for free or unlock more storage and features with a paid plan.
+            <p class="text-muted-foreground mt-2 max-w-sm mx-auto text-sm">
+                Start for free or unlock more storage and features.<br>
+                You can change your plan anytime.
             </p>
         </div>
 
-        <!-- Error -->
-        <div v-if="errorMessage" class="mb-6 w-full max-w-5xl rounded-xl bg-red-500/10 border border-red-500/20 px-5 py-3 text-sm text-red-600 text-center">
+        <!-- Error banner -->
+        <div
+            v-if="errorMessage"
+            class="mb-8 w-full max-w-5xl rounded-xl bg-red-500/10 border border-red-500/20 px-5 py-3 text-sm text-red-600 text-center"
+        >
             {{ errorMessage }}
         </div>
 
-        <!-- Plan Cards -->
+        <!-- Plan cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
             <div
                 v-for="plan in plans.data"
@@ -136,19 +146,19 @@ onMounted(() => {
                     ? 'border-[#7B2FFF]/50 bg-gradient-to-br from-[#7B2FFF]/10 to-[#00E5FF]/5 shadow-md'
                     : 'border-border bg-card'"
             >
-                <!-- Most Popular badge -->
-                <div v-if="plan.slug === 'pro'" class="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge class="bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white border-0 px-3 shadow">
+                <!-- Most popular badge -->
+                <div v-if="plan.slug === 'pro'" class="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
+                    <Badge class="bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white border-0 px-3 shadow-sm">
                         Most popular
                     </Badge>
                 </div>
 
-                <!-- Header -->
+                <!-- Plan header -->
                 <div class="mb-6">
                     <p class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                         {{ plan.name }}
                     </p>
-                    <div class="flex items-end gap-1 mb-2">
+                    <div class="flex items-end gap-1 mb-1">
                         <span class="text-4xl font-bold tracking-tight">
                             {{ plan.is_free ? 'Free' : '$' + plan.price }}
                         </span>
@@ -157,7 +167,7 @@ onMounted(() => {
                     <p class="text-sm text-muted-foreground">{{ plan.storage_limit_human }} storage</p>
                 </div>
 
-                <!-- Features -->
+                <!-- Feature list -->
                 <ul class="space-y-3 mb-8 flex-1">
                     <li
                         v-for="feature in plan.features"
@@ -171,35 +181,42 @@ onMounted(() => {
                     </li>
                 </ul>
 
-                <!-- CTA -->
+                <!-- FREE: one click, no payment info collected -->
                 <div v-if="plan.is_free">
                     <Button
                         variant="outline"
                         class="w-full"
-                        :disabled="selecting === plan.id"
+                        :disabled="selecting !== null"
                         @click="selectFreePlan(plan)"
                     >
                         <Loader2 v-if="selecting === plan.id" class="h-4 w-4 animate-spin mr-2" />
-                        {{ selecting === plan.id ? 'Setting up...' : 'Get started for free' }}
+                        {{ selecting === plan.id ? 'Setting up…' : 'Get started for free' }}
                     </Button>
+                    <p class="text-xs text-center text-muted-foreground mt-2">No credit card required</p>
                 </div>
 
-                <!-- PayPal button container for paid plans -->
+                <!-- PAID: PayPal SDK button rendered by onMounted -->
                 <div v-else>
-                    <div v-if="selecting === plan.id" class="flex items-center justify-center py-3 text-sm text-muted-foreground gap-2">
+                    <div
+                        v-if="selecting === plan.id"
+                        class="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground"
+                    >
                         <Loader2 class="h-4 w-4 animate-spin" /> Processing payment…
                     </div>
-                    <div v-show="!selecting" :id="`paypal-button-${plan.id}`" class="min-h-[44px]" />
-                    <p v-if="!paypalReady && !selecting" class="text-xs text-center text-muted-foreground mt-2">
-                        Loading PayPal…
+                    <div
+                        v-show="selecting !== plan.id"
+                        :id="`paypal-btn-${plan.id}`"
+                        class="min-h-[44px]"
+                    />
+                    <p class="text-xs text-center text-muted-foreground mt-2 flex items-center justify-center gap-1">
+                        <ShieldCheck class="h-3 w-3" /> Secured by PayPal
                     </p>
                 </div>
             </div>
         </div>
 
-        <p class="text-xs text-muted-foreground mt-8">
-            You can change your plan anytime from your account settings.
-            Payments are securely processed by PayPal.
+        <p class="text-xs text-muted-foreground mt-10">
+            You can upgrade, downgrade, or cancel your plan at any time from your account settings.
         </p>
     </div>
 </template>
