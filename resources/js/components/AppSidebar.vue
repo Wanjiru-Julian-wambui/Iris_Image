@@ -97,8 +97,11 @@ const adminNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-            <!-- Storage bar -->
-            <div v-if="user" class="px-3 pb-2">
+            <!-- Storage bar — hidden when sidebar is collapsed to icon -->
+            <div
+                v-if="user"
+                class="px-3 pb-2 group-data-[collapsible=icon]:hidden"
+            >
                 <StorageBar
                     compact
                     :used="user.storage_used ?? 0"

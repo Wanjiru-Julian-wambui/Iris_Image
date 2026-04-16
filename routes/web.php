@@ -54,6 +54,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Shared links
         Route::get('/shared-links',               [SharedLinkController::class, 'index'])->name('shared-links.index');
+        Route::get('/shared-links/create',        [SharedLinkController::class, 'create'])->name('shared-links.create'); // ← add this
         Route::post('/shared-links',              [SharedLinkController::class, 'store'])->name('shared-links.store');
         Route::delete('/shared-links/{sharedLink}', [SharedLinkController::class, 'destroy'])->name('shared-links.destroy');
 

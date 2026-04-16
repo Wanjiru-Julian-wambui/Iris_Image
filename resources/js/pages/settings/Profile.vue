@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/DeleteUser.vue';
 import Heading from '@/components/Heading.vue';
@@ -22,20 +22,26 @@ type Props = {
 defineProps<Props>();
 
 const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: edit(),
-    },
+    { title: 'Profile settings', href: edit() },
 ];
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+
+// Local preview overrides avatar_url until the page reloads after save
+const avatarPreview = ref<string | null>(null);
+
+function onAvatarChange(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file) {
+        avatarPreview.value = URL.createObjectURL(file);
+    }
+}
 </script>
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbItems">
         <Head title="Profile settings" />
-
         <h1 class="sr-only">Profile settings</h1>
 
         <SettingsLayout>
@@ -43,14 +49,54 @@ const user = computed(() => page.props.auth.user);
                 <Heading
                     variant="small"
                     title="Profile information"
-                    description="Update your name and email address"
+                    description="Update your name, email address, and avatar"
                 />
 
                 <Form
                     v-bind="ProfileController.update.form()"
+                    enctype="multipart/form-data"
                     class="space-y-6"
                     v-slot="{ errors, processing, recentlySuccessful }"
                 >
+                    <!-- Avatar -->
+                    <div class="grid gap-2">
+                        <Label>Avatar</Label>
+                        <div class="flex items-center gap-4">
+                            <img
+                                :src="avatarPreview ?? user.avatar_url"
+                                :alt="user.name"
+                                class="h-16 w-16 rounded-full object-cover ring-2 ring-border"
+                            />
+
+                            <div class="flex flex-col gap-1">
+                                <label
+                                    for="avatar"
+                                    class="cursor-pointer inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="17 8 12 3 7 8"/>
+                                        <line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                    Choose image
+                                </label>
+                                <span class="text-xs text-muted-foreground">
+                                    JPG, PNG, GIF or WebP · max 2 MB
+                                </span>
+                                <input
+                                    id="avatar"
+                                    name="avatar"
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/gif,image/webp"
+                                    class="sr-only"
+                                    @change="onAvatarChange"
+                                />
+                            </div>
+                        </div>
+                        <InputError class="mt-1" :message="errors.avatar" />
+                    </div>
+
+                    <!-- Name -->
                     <div class="grid gap-2">
                         <Label for="name">Name</Label>
                         <Input
@@ -65,6 +111,7 @@ const user = computed(() => page.props.auth.user);
                         <InputError class="mt-2" :message="errors.name" />
                     </div>
 
+                    <!-- Email -->
                     <div class="grid gap-2">
                         <Label for="email">Email address</Label>
                         <Input
@@ -80,6 +127,7 @@ const user = computed(() => page.props.auth.user);
                         <InputError class="mt-2" :message="errors.email" />
                     </div>
 
+                    <!-- Email verification notice -->
                     <div v-if="mustVerifyEmail && !user.email_verified_at">
                         <p class="-mt-4 text-sm text-muted-foreground">
                             Your email address is unverified.
@@ -91,33 +139,26 @@ const user = computed(() => page.props.auth.user);
                                 Click here to resend the verification email.
                             </Link>
                         </p>
-
                         <div
                             v-if="status === 'verification-link-sent'"
                             class="mt-2 text-sm font-medium text-green-600"
                         >
-                            A new verification link has been sent to your email
-                            address.
+                            A new verification link has been sent to your email address.
                         </div>
                     </div>
 
+                    <!-- Submit -->
                     <div class="flex items-center gap-4">
-                        <Button
-                            :disabled="processing"
-                            data-test="update-profile-button"
-                            >Save</Button
-                        >
-
+                        <Button :disabled="processing" data-test="update-profile-button">
+                            Save
+                        </Button>
                         <Transition
                             enter-active-class="transition ease-in-out"
                             enter-from-class="opacity-0"
                             leave-active-class="transition ease-in-out"
                             leave-to-class="opacity-0"
                         >
-                            <p
-                                v-show="recentlySuccessful"
-                                class="text-sm text-neutral-600"
-                            >
+                            <p v-show="recentlySuccessful" class="text-sm text-neutral-600">
                                 Saved.
                             </p>
                         </Transition>

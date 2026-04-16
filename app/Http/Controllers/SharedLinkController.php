@@ -28,6 +28,18 @@ class SharedLinkController extends Controller
         ]);
     }
 
+    public function create(Request $request): Response
+    {
+        $images = $request->user()
+            ->images()
+            ->latest()
+            ->get();
+
+        return Inertia::render('shared-links/Create', [
+            'images' => ImageResource::collection($images),
+        ]);
+    }
+
     public function store(SharedLinkRequest $request)
     {
         $link = $this->sharedLinkService->create(
