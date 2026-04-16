@@ -37,8 +37,8 @@ class ImageController extends Controller
             $request->file('images'),
             $request->user(),
             [
-                'is_private'  => $request->boolean('is_private', false),
-                'strip_exif'  => $request->boolean('strip_exif', config('iris.strip_exif')),
+                'is_private' => $request->boolean('is_private', false),
+                'strip_exif' => $request->boolean('strip_exif', config('iris.strip_exif')),
             ]
         );
 
@@ -49,7 +49,7 @@ class ImageController extends Controller
 
     public function show(Image $image): Response
     {
-        $this->authorize('view', $image);
+        abort_unless($image->user_id === auth()->id(), 403);
 
         $image->load(['user', 'sharedLinks']);
 
@@ -58,9 +58,27 @@ class ImageController extends Controller
         ]);
     }
 
+    public function gallery(Request $request): Response
+    {
+        $images = $request->user()
+            ->images()
+            ->when($request->search, fn($q, $s) => $q->where('name', 'like', "%{$s}%"))
+            ->when($request->sort === 'oldest',   fn($q) => $q->oldest())
+            ->when($request->sort === 'largest',  fn($q) => $q->orderByDesc('size'))
+            ->when($request->sort === 'smallest', fn($q) => $q->orderBy('size'))
+            ->when($request->sort === 'name',     fn($q) => $q->orderBy('name'))
+            ->when(!$request->sort || $request->sort === 'latest', fn($q) => $q->latest())
+            ->paginate(40);
+
+        return Inertia::render('Gallery', [
+            'images'  => ImageResource::collection($images),
+            'filters' => $request->only(['search', 'sort']),
+        ]);
+    }
+
     public function destroy(Image $image)
     {
-        $this->authorize('delete', $image);
+        abort_unless($image->user_id === auth()->id(), 403);
 
         $this->imageService->delete($image);
 

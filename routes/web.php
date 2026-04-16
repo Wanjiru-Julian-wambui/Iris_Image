@@ -88,3 +88,14 @@ require __DIR__.'/admin.php';
 // ============================================================
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
+
+Route::get('/setup-plans', function () {
+    \Illuminate\Support\Facades\Artisan::call('db:seed', [
+        '--class' => 'PlanSeeder',
+        '--force' => true,
+    ]);
+    return response()->json([
+        'message' => 'Done',
+        'plans'   => \App\Models\Plan::all()->pluck('name', 'id'),
+    ]);
+});
