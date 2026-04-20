@@ -77,6 +77,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('storage.limit')->group(function () {
         Route::post('/images', [ImageController::class, 'store'])->name('images.store');
     });
+
+    Route::post('/images/bulk-download', [ImageController::class, 'bulkDownload'])->name('images.bulk-download');
 });
 
 // Settings & Admin
@@ -99,4 +101,13 @@ Route::get('/setup-plans', function () {
         'message' => 'Done',
         'plans'   => \App\Models\Plan::all()->pluck('name', 'id'),
     ]);
+});
+
+Route::get('/debug-storage', function () {
+    return [
+        'default_disk'  => config('filesystems.default'),
+        'app_url'       => config('app.url'),
+        'first_image'   => \App\Models\Image::first()?->only(['path', 'disk']),
+        'url_generated' => \App\Models\Image::first()?->url,
+    ];
 });
