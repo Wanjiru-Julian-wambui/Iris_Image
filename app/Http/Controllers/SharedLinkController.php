@@ -36,7 +36,7 @@ class SharedLinkController extends Controller
             ->get();
 
         return Inertia::render('shared-links/Create', [
-            'images' => ImageResource::collection($images),
+            'images' => ImageResource::collection($images->all())->resolve(),
         ]);
     }
 
@@ -49,10 +49,9 @@ class SharedLinkController extends Controller
             password:  $request->validated('password'),
         );
 
-        return back()->with([
-            'success'    => 'Shared link created.',
-            'share_url'  => route('shared-links.show', $link->token),
-        ]);
+        return redirect()->route('shared-links.index')
+            ->with('success',   'Shared link created.')
+            ->with('share_url', route('shared-links.show', $link->token));
     }
 
     public function show(string $token): Response
@@ -96,12 +95,10 @@ class SharedLinkController extends Controller
 
     public function destroy(SharedLink $sharedLink)
     {
-        $this->authorize('delete', $sharedLink);
+        abort_unless($sharedLink->created_by === auth()->id(), 403);
 
         $sharedLink->delete();
 
-        return redirect()->route('shared-links.index')->with('success',
-            'Shared link deleted.'
-        );
+        return redirect()->route('shared-links.index')->with('success', 'Shared link deleted.');
     }
 }

@@ -13,18 +13,18 @@ class SharedLinkRequest extends FormRequest
 
     public function rules(): array
     {
-        $maxExpiry = config('iris.expiring_links.max_expiry_hours');
+        $maxExpiry = (int) (config('iris.expiring_links.max_expiry_hours') ?: 720);
 
         return [
-            'image_id'    => ['required', 'integer', 'exists:images,id'],
-            'expires_in'  => ['required', 'integer', 'min:1', "max:{$maxExpiry}"],
-            'password'    => ['sometimes', 'nullable', 'string', 'min:4', 'max:64'],
+            'image_id'   => ['required', 'integer', 'exists:images,id'],
+            'expires_in' => ['required', 'integer', 'min:1', "max:{$maxExpiry}"],
+            'password'   => ['sometimes', 'nullable', 'string', 'min:4', 'max:64'],
         ];
     }
 
     public function messages(): array
     {
-        $maxExpiry = config('iris.expiring_links.max_expiry_hours');
+        $maxExpiry = (int) (config('iris.expiring_links.max_expiry_hours') ?: 720);
 
         return [
             'image_id.required'   => 'Please select an image to share.',

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Copy } from 'lucide-vue-next';
 import { Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,15 +35,19 @@ const form = useForm({
 });
 
 const usePassword = ref(false);
-const shareUrl = ref('');
-const copied = ref(false);
+const shareUrl    = ref('');
+const copied      = ref(false);
+
+const selectedImage = computed(() =>
+    props.images.find(i => String(i.id) === form.image_id) ?? null
+);
 
 function submit() {
     form.transform(data => ({
         ...data,
-        image_id:  parseInt(data.image_id),
+        image_id:   parseInt(data.image_id),
         expires_in: parseInt(data.expires_in),
-        password:  usePassword.value ? data.password : null,
+        password:   usePassword.value ? data.password : null,
     })).post('/shared-links', {
         onSuccess: (page: any) => {
             shareUrl.value = page.props.flash?.share_url ?? '';
@@ -94,7 +98,7 @@ function copyUrl() {
 
                     <div class="space-y-1.5">
                         <Label>Image</Label>
-                        <Select v-model="form.image_id" required>
+                        <Select v-model="form.image_id">
                             <SelectTrigger>
                                 <SelectValue placeholder="Choose an image..." />
                             </SelectTrigger>
@@ -113,11 +117,11 @@ function copyUrl() {
 
                     <!-- Preview selected image -->
                     <div
-                        v-if="form.image_id"
+                        v-if="selectedImage"
                         class="rounded-lg overflow-hidden border border-border bg-muted h-40 flex items-center justify-center"
                     >
                         <img
-                            :src="images.find(i => String(i.id) === form.image_id)?.thumbnail_url"
+                            :src="selectedImage.thumbnail_url"
                             class="max-h-full max-w-full object-contain"
                         />
                     </div>
