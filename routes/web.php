@@ -111,3 +111,11 @@ Route::get('/debug-storage', function () {
         'url_generated' => \App\Models\Image::first()?->url,
     ];
 });
+
+Route::get('/debug-storage', function () {
+    return [
+        'symlink_exists' => file_exists(public_path('storage')),
+        'disk'           => config('filesystems.default'),
+        'test_url'       => \App\Models\Image::first()?->url,
+    ];
+});
