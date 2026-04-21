@@ -8,6 +8,7 @@ use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SharedLinkController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
+use Illuminate\Support\Facades\Storage;
 
 // ============================================================
 // PUBLIC
@@ -92,30 +93,26 @@ require __DIR__.'/admin.php';
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
 
-Route::get('/setup-plans', function () {
-    \Illuminate\Support\Facades\Artisan::call('db:seed', [
-        '--class' => 'PlanSeeder',
-        '--force' => true,
-    ]);
-    return response()->json([
-        'message' => 'Done',
-        'plans'   => \App\Models\Plan::all()->pluck('name', 'id'),
-    ]);
-});
-
-Route::get('/debug-storage', function () {
-    return [
-        'default_disk'  => config('filesystems.default'),
-        'app_url'       => config('app.url'),
-        'first_image'   => \App\Models\Image::first()?->only(['path', 'disk']),
-        'url_generated' => \App\Models\Image::first()?->url,
-    ];
-});
-
-Route::get('/debug-storage', function () {
-    return [
-        'symlink_exists' => file_exists(public_path('storage')),
-        'disk'           => config('filesystems.default'),
-        'test_url'       => \App\Models\Image::first()?->url,
-    ];
-});
+Route::get('/debug-upload-error', function () {
+    try {
+        $disk = Storage::disk(config('filesystems.default'));
+        $disk->put('test.txt', 'hello');
+        $url = $disk->url('test.txt');
+        $disk->delete('test.txt');
+        return [
+            'status'   => 'success',
+            'disk'     => config('filesystems.default'),
+            'test_url' => $url,
+            'bucket'   => env('AWS_BUCKET'),
+            'endpoint' => env('AWS_ENDPOINT_URL_S3'),
+            'region'   => env('AWS_DEFAULT_REGION'),
+            'key_set'  => ! empty(env('AWS_ACCESS_KEY_ID')),
+        ];
+    } catch (\Exception $e) {
+        return [
+            'status' => 'error',
+            'error'  => $e->getMessage(),
+            'disk'   => config('filesystems.default'),
+        ];
+    }
+})->middleware('auth');
