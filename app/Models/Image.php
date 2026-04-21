@@ -62,18 +62,18 @@ class Image extends Model
 
     public function getUrlAttribute(): string
     {
-        return Storage::url($this->path);
+        return Storage::disk(config('filesystems.default'))->url($this->path);
     }
 
     public function getThumbnailUrlAttribute(): string
     {
-        return Storage::url($this->thumbnail_path ?? $this->path);
+        $path = $this->thumbnail_path ?? $this->path;
+        return Storage::disk(config('filesystems.default'))->url($path);
     }
 
     public function getSizeHumanAttribute(): string
     {
         $bytes = $this->size;
-
         if ($bytes >= 1073741824) {
             return number_format($bytes / 1073741824, 2) . ' GB';
         } elseif ($bytes >= 1048576) {
@@ -81,7 +81,6 @@ class Image extends Model
         } elseif ($bytes >= 1024) {
             return number_format($bytes / 1024, 2) . ' KB';
         }
-
         return $bytes . ' B';
     }
 
@@ -94,12 +93,10 @@ class Image extends Model
     protected static function booted(): void
     {
         static::deleted(function (Image $image) {
-            Storage::delete($image->path);
-
+            Storage::disk(config('filesystems.default'))->delete($image->path);
             if ($image->thumbnail_path) {
-                Storage::delete($image->thumbnail_path);
+                Storage::disk(config('filesystems.default'))->delete($image->thumbnail_path);
             }
-
             $image->user->decrement('storage_used', $image->size);
         });
     }
