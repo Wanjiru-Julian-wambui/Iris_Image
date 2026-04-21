@@ -28,7 +28,7 @@ return [
             'region'                  => env('AWS_DEFAULT_REGION', 'auto'),
             'bucket'                  => env('AWS_BUCKET'),
             'url'                     => env('AWS_URL'),
-            'endpoint'                => env('AWS_ENDPOINT_URL_S3'),
+            'endpoint'                => env('AWS_ENDPOINT', env('AWS_ENDPOINT_URL_S3')),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw'                   => true,
             'visibility'              => 'public',
