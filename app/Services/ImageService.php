@@ -6,12 +6,13 @@ use App\Models\Image;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class ImageService
 {
     public function __construct(
         protected StorageService $storageService,
-        protected ExifService $exifService,
+        protected ExifService    $exifService,
     ) {}
 
     public function uploadMany(array|UploadedFile $files, User $user, array $options = []): array
@@ -21,7 +22,6 @@ class ImageService
         }
 
         $uploaded = [];
-
         foreach ($files as $file) {
             if ($file instanceof UploadedFile) {
                 $uploaded[] = $this->upload($file, $user, $options);
@@ -43,27 +43,28 @@ class ImageService
         );
 
         return DB::transaction(function () use ($file, $user, $stripExif, $isPrivate) {
-
-            // Store file
-            $path = $this->storageService->store($file, $user);
-
-            // Get absolute path safely
-            $fullPath = $this->storageService->path($path);
-
-            if (!file_exists($fullPath)) {
-                throw new \Exception("File missing after upload: " . $fullPath);
-            }
-
-            // Dimensions
+            // Get dimensions BEFORE upload while the file is still local
             [$width, $height] = $this->getDimensions($file);
 
-            // Strip EXIF
+            // Strip EXIF on the local temp file BEFORE uploading to S3
             $exifStripped = false;
             if ($stripExif) {
-                $exifStripped = $this->exifService->strip($fullPath);
+                $localPath = $file->getRealPath();
+                if ($localPath && file_exists($localPath)) {
+                    $exifStripped = $this->exifService->strip($localPath);
+                }
             }
 
-            // Save DB
+            // Store file (uploads to configured disk — s3 on production)
+            $path = $this->storageService->store($file, $user);
+
+            // Verify upload succeeded using Storage facade (works with S3)
+            $disk = config('filesystems.default');
+            if (!Storage::disk($disk)->exists($path)) {
+                throw new \Exception("File missing after upload: {$path}");
+            }
+
+            // Save to DB
             $image = Image::create([
                 'user_id'       => $user->id,
                 'name'          => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
