@@ -3,11 +3,11 @@ import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
+import { ref, onMounted, computed } from 'vue';
 
-// 1. Define the props coming from DashboardController
-defineProps<{
+const props = defineProps<{
     user: any;
-    recentImages: { data: any[] }; // This matches your ImageResource collection
+    recentImages: { data: any[] };
     stats: {
         total_images: number;
         storage_used: string;
@@ -17,65 +17,282 @@ defineProps<{
     };
 }>();
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-    },
-];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: dashboard() }];
+
+// ── Animated counters ──────────────────────────────────────────────
+const animatedImages  = ref(0);
+const animatedLinks   = ref(0);
+const animatedPercent = ref(0);
+const mounted         = ref(false);
+
+function animateCounter(target: number, setter: (v: number) => void, duration = 1200) {
+    const start = performance.now();
+    const step  = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        const ease     = 1 - Math.pow(1 - progress, 3);
+        setter(Math.round(target * ease));
+        if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
+
+onMounted(() => {
+    setTimeout(() => {
+        mounted.value = true;
+        animateCounter(props.stats.total_images,   v => animatedImages.value  = v);
+        animateCounter(props.stats.shared_links,   v => animatedLinks.value   = v);
+        animateCounter(props.stats.storage_percent, v => animatedPercent.value = v, 1400);
+    }, 100);
+});
+
+// ── Pie / donut chart ──────────────────────────────────────────────
+const SIZE   = 160;
+const STROKE = 18;
+const R      = (SIZE - STROKE) / 2;
+const CIRCUM = 2 * Math.PI * R;
+
+const usedDash = computed(() => {
+    const pct = Math.min(animatedPercent.value, 100) / 100;
+    return `${pct * CIRCUM} ${CIRCUM}`;
+});
+
+// Colour stops matching the app brand
+const gradId = 'storageGrad';
 </script>
 
 <template>
     <Head title="Dashboard" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex h-full flex-1 flex-col gap-4 p-4">
-            
-            <div class="grid auto-rows-min gap-4 md:grid-cols-3">
-                <div class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                    <div class="text-sm text-muted-foreground text-gray-400">Total Images</div>
-                    <div class="text-2xl font-bold">{{ stats.total_images }}</div>
-                </div>
-                <div class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                    <div class="text-sm text-muted-foreground text-gray-400">Storage Used</div>
-                    <div class="text-2xl font-bold">{{ stats.storage_percent }}%</div>
-                </div>
-                <div class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                    <div class="text-sm text-muted-foreground text-gray-400">Active Links</div>
-                    <div class="text-2xl font-bold">{{ stats.shared_links }}</div>
-                </div>
+        <div class="flex h-full flex-1 flex-col gap-6 p-6">
+
+            <!-- ── Welcome banner ──────────────────────────────────── -->
+            <div
+                class="relative overflow-hidden rounded-2xl px-8 py-7"
+                style="background: linear-gradient(135deg, #7B2FFF 0%, #3b82f6 60%, #00E5FF 100%)"
+                :class="mounted ? 'banner-in' : 'opacity-0'"
+            >
+                <!-- decorative circles -->
+                <div class="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10" />
+                <div class="pointer-events-none absolute -bottom-8 right-24 h-28 w-28 rounded-full bg-white/10" />
+
+                <p class="text-sm font-medium text-white/70 mb-1">Welcome back</p>
+                <h1 class="text-2xl font-bold text-white tracking-tight">{{ user.name }} 👋</h1>
+                <p class="mt-1 text-sm text-white/60">Here's what's happening with your files today.</p>
             </div>
 
-            <div class="relative min-h-[100vh] flex-1 rounded-xl border border-sidebar-border/70 p-6 md:min-h-min dark:border-sidebar-border">
-                <div class="mb-6 flex items-center justify-between">
-                    <h2 class="text-xl font-semibold">Recent Uploads</h2>
-                    <Link href="/images" class="text-sm text-indigo-500 hover:text-indigo-400 font-medium">View Gallery →</Link>
+            <!-- ── Stat cards ──────────────────────────────────────── -->
+            <div class="grid gap-4 sm:grid-cols-3">
+
+                <!-- Total images -->
+                <div
+                    class="stat-card rounded-2xl border border-white/8 bg-card p-6 flex flex-col gap-3"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.05s"
+                >
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total Images</span>
+                        <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 text-base">🖼</span>
+                    </div>
+                    <span class="text-4xl font-bold tabular-nums text-foreground">{{ animatedImages }}</span>
+                    <div class="h-1 w-full rounded-full bg-muted overflow-hidden">
+                        <div
+                            class="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-1000"
+                            :style="{ width: mounted ? '100%' : '0%' }"
+                        />
+                    </div>
                 </div>
 
-                <div v-if="recentImages.data.length > 0" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                    <div 
-                        v-for="image in recentImages.data" 
-                        :key="image.id"
-                        class="group relative aspect-square overflow-hidden rounded-lg bg-black/5 dark:bg-white/5 border border-sidebar-border/50"
-                    >
-                        <img 
-                            :src="image.thumbnail_url" 
-                            :alt="image.name"
-                            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        />
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100 flex items-end p-3">
-                            <span class="text-xs text-white truncate">{{ image.name }}</span>
+                <!-- Storage donut -->
+                <div
+                    class="stat-card rounded-2xl border border-white/8 bg-card p-6 flex flex-col gap-3"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.12s"
+                >
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Storage</span>
+                        <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400 text-base">💾</span>
+                    </div>
+
+                    <div class="flex items-center gap-5">
+                        <!-- Animated SVG donut -->
+                        <div class="relative shrink-0">
+                            <svg :width="SIZE" :height="SIZE" class="-rotate-90" style="overflow:visible">
+                                <defs>
+                                    <linearGradient :id="gradId" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%"   stop-color="#7B2FFF" />
+                                        <stop offset="100%" stop-color="#00E5FF" />
+                                    </linearGradient>
+                                </defs>
+                                <!-- track -->
+                                <circle
+                                    :cx="SIZE/2" :cy="SIZE/2" :r="R"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    class="text-muted/40"
+                                    :stroke-width="STROKE"
+                                />
+                                <!-- filled arc -->
+                                <circle
+                                    :cx="SIZE/2" :cy="SIZE/2" :r="R"
+                                    fill="none"
+                                    :stroke="`url(#${gradId})`"
+                                    :stroke-width="STROKE"
+                                    stroke-linecap="round"
+                                    :stroke-dasharray="usedDash"
+                                    style="transition: stroke-dasharray 1.4s cubic-bezier(0.34,1.56,0.64,1)"
+                                />
+                            </svg>
+                            <!-- centre label -->
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-2xl font-bold tabular-nums text-foreground leading-none">{{ animatedPercent }}%</span>
+                                <span class="text-[10px] text-muted-foreground mt-0.5">used</span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-1 min-w-0">
+                            <p class="text-sm font-semibold text-foreground truncate">{{ stats.storage_used }}</p>
+                            <p class="text-xs text-muted-foreground">of {{ stats.storage_limit }}</p>
+                            <div class="mt-2 flex items-center gap-1.5">
+                                <span class="inline-block h-2 w-2 rounded-full bg-gradient-to-br from-violet-500 to-cyan-400" />
+                                <span class="text-xs text-muted-foreground">Used</span>
+                                <span class="ml-2 inline-block h-2 w-2 rounded-full bg-muted" />
+                                <span class="text-xs text-muted-foreground">Free</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div v-else class="flex flex-col items-center justify-center py-20 text-center">
-                    <div class="mb-4 rounded-full bg-sidebar-border/20 p-4">
-                        📸
+                <!-- Active links -->
+                <div
+                    class="stat-card rounded-2xl border border-white/8 bg-card p-6 flex flex-col gap-3"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.19s"
+                >
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Active Links</span>
+                        <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 text-base">🔗</span>
                     </div>
-                    <p class="text-sm text-muted-foreground">No images found. Start by uploading some files!</p>
+                    <span class="text-4xl font-bold tabular-nums text-foreground">{{ animatedLinks }}</span>
+                    <Link
+                        href="/shared-links"
+                        class="mt-auto text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                        Manage links →
+                    </Link>
                 </div>
             </div>
+
+            <!-- ── Recent uploads ──────────────────────────────────── -->
+            <div
+                class="rounded-2xl border border-white/8 bg-card p-6"
+                :class="mounted ? 'card-in' : 'opacity-0'"
+                style="animation-delay: 0.28s"
+            >
+                <div class="mb-5 flex items-center justify-between">
+                    <h2 class="text-base font-semibold text-foreground">Recent Uploads</h2>
+                    <Link
+                        href="/images"
+                        class="text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors"
+                    >
+                        View all →
+                    </Link>
+                </div>
+
+                <!-- Grid -->
+                <div
+                    v-if="recentImages.data.length > 0"
+                    class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                >
+                    <div
+                        v-for="(image, i) in recentImages.data"
+                        :key="image.id"
+                        class="image-tile group relative aspect-square overflow-hidden rounded-xl bg-muted border border-white/5 cursor-pointer"
+                        :style="{ animationDelay: `${0.3 + i * 0.05}s` }"
+                        :class="mounted ? 'tile-in' : 'opacity-0'"
+                    >
+                        <img
+                            :src="image.thumbnail_url"
+                            :alt="image.name"
+                            class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            loading="lazy"
+                        />
+                        <!-- hover overlay -->
+                        <div class="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/20 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                            <span class="truncate text-xs font-medium text-white">{{ image.name }}</span>
+                            <span class="text-[10px] text-white/60 mt-0.5">{{ image.size_human }}</span>
+                        </div>
+                        <!-- shimmer on load -->
+                        <div class="shimmer absolute inset-0 pointer-events-none" />
+                    </div>
+                </div>
+
+                <!-- Empty state -->
+                <div v-else class="flex flex-col items-center justify-center py-16 text-center">
+                    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-3xl">📸</div>
+                    <p class="font-medium text-foreground mb-1">No images yet</p>
+                    <p class="text-sm text-muted-foreground mb-4">Start by uploading your first file.</p>
+                    <Link
+                        href="/images/create"
+                        class="rounded-xl bg-gradient-to-r from-violet-500 to-cyan-400 px-5 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                    >
+                        Upload images
+                    </Link>
+                </div>
+            </div>
+
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+/* Banner slide-in */
+.banner-in {
+    animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Stat cards */
+.card-in {
+    animation: fadeUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Image tiles */
+.tile-in {
+    animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes popIn {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* Hover lift on cards */
+.stat-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px -8px rgba(123, 47, 255, 0.2);
+}
+
+/* Image tile shimmer (fades out after load) */
+.shimmer {
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.8s infinite;
+}
+.image-tile img[src] ~ .shimmer {
+    display: none;
+}
+@keyframes shimmer {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+}
+</style>
