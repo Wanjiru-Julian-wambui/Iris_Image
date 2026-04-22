@@ -71,8 +71,8 @@ class SharedLinkController extends Controller
         $link->increment('view_count');
 
         return Inertia::render('shared-links/Show', [
-            'image' => new ImageResource($link->image),
-            'link'  => new SharedLinkResource($link),
+            'image' => (new ImageResource($link->image))->resolve(),
+            'link'  => (new SharedLinkResource($link))->resolve(),
         ]);
     }
 
