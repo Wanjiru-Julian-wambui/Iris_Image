@@ -10,14 +10,30 @@ const props = defineProps<{
     recentImages: { data: any[] };
     stats: {
         total_images: number;
-        storage_used: string;
-        storage_limit: string;
+        storage_used: string | number;
+        storage_limit: string | number;
         storage_percent: number;
         shared_links: number;
     };
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: dashboard() }];
+
+// ── Storage formatter ──────────────────────────────────────────────
+// Handles raw bytes (number) OR already-formatted strings ("667.81 KB")
+function formatBytes(value: string | number): string {
+    // Already a formatted string (contains letters)?
+    if (typeof value === 'string' && /[a-zA-Z]/.test(value)) return value;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num) || num === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(num) / Math.log(1024)), units.length - 1);
+    const val = num / Math.pow(1024, i);
+    return `${val % 1 === 0 ? val : val.toFixed(2)} ${units[i]}`;
+}
+
+const storageUsed  = computed(() => formatBytes(props.stats.storage_used));
+const storageLimit = computed(() => formatBytes(props.stats.storage_limit));
 
 // ── Animated counters ──────────────────────────────────────────────
 const animatedImages  = ref(0);
@@ -46,15 +62,17 @@ onMounted(() => {
 });
 
 // ── Donut chart ────────────────────────────────────────────────────
-const SIZE   = 120;
-const STROKE = 14;
+// Random unique ID prevents scoped-CSS from mangling the gradient reference
+const uid    = Math.random().toString(36).slice(2, 8);
+const gradId = `sg-${uid}`;
+const SIZE   = 130;
+const STROKE = 15;
 const R      = (SIZE - STROKE) / 2;
 const CIRCUM = 2 * Math.PI * R;
-const gradId = 'storageGrad';
 
 const usedDash = computed(() => {
     const pct = Math.min(animatedPercent.value, 100) / 100;
-    return `${pct * CIRCUM} ${CIRCUM}`;
+    return `${(pct * CIRCUM).toFixed(2)} ${CIRCUM.toFixed(2)}`;
 });
 </script>
 
@@ -90,12 +108,19 @@ const usedDash = computed(() => {
                 >
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total Images</span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15 text-lg">🖼️</span>
+                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                        </span>
                     </div>
                     <span class="text-5xl font-bold tabular-nums text-foreground leading-none">{{ animatedImages }}</span>
                     <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden mt-auto">
                         <div
-                            class="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-400 transition-all duration-[1200ms] ease-out"
+                            class="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-400"
+                            style="transition: width 1.2s cubic-bezier(0.34,1.56,0.64,1)"
                             :style="{ width: mounted ? '100%' : '0%' }"
                         />
                     </div>
@@ -109,13 +134,28 @@ const usedDash = computed(() => {
                 >
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Storage</span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15 text-lg">💾</span>
+                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                            </svg>
+                        </span>
                     </div>
 
-                    <div class="flex items-center gap-4">
-                        <!-- Donut -->
+                    <div class="flex items-center gap-5">
+                        <!--
+                            Donut SVG
+                            IMPORTANT: The <defs> gradient is defined inline with a unique
+                            runtime ID so Vue's scoped-CSS hashing never breaks the url() ref.
+                        -->
                         <div class="relative shrink-0" :style="`width:${SIZE}px;height:${SIZE}px`">
-                            <svg :width="SIZE" :height="SIZE" style="transform:rotate(-90deg);overflow:visible">
+                            <svg
+                                :width="SIZE"
+                                :height="SIZE"
+                                :viewBox="`0 0 ${SIZE} ${SIZE}`"
+                                style="transform: rotate(-90deg); display: block;"
+                            >
                                 <defs>
                                     <linearGradient :id="gradId" x1="0%" y1="0%" x2="100%" y2="0%">
                                         <stop offset="0%"   stop-color="#7B2FFF" />
@@ -124,15 +164,14 @@ const usedDash = computed(() => {
                                 </defs>
                                 <!-- track -->
                                 <circle
-                                    :cx="SIZE/2" :cy="SIZE/2" :r="R"
+                                    :cx="SIZE / 2" :cy="SIZE / 2" :r="R"
                                     fill="none"
-                                    class="text-muted stroke-current"
+                                    stroke="#e5e7eb"
                                     :stroke-width="STROKE"
-                                    stroke-opacity="0.3"
                                 />
                                 <!-- filled arc -->
                                 <circle
-                                    :cx="SIZE/2" :cy="SIZE/2" :r="R"
+                                    :cx="SIZE / 2" :cy="SIZE / 2" :r="R"
                                     fill="none"
                                     :stroke="`url(#${gradId})`"
                                     :stroke-width="STROKE"
@@ -142,25 +181,25 @@ const usedDash = computed(() => {
                                 />
                             </svg>
                             <!-- centre label -->
-                            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <div class="absolute inset-0 flex flex-col items-center justify-center" style="pointer-events:none">
                                 <span class="text-xl font-bold tabular-nums text-foreground leading-none">{{ animatedPercent }}%</span>
-                                <span class="text-[10px] text-muted-foreground mt-0.5">used</span>
+                                <span class="text-[11px] text-muted-foreground mt-0.5">used</span>
                             </div>
                         </div>
 
-                        <!-- Legend -->
-                        <div class="flex flex-col gap-2 min-w-0">
+                        <!-- Storage legend -->
+                        <div class="flex flex-col gap-3 min-w-0">
                             <div>
-                                <p class="text-sm font-semibold text-foreground">{{ stats.storage_used }}</p>
-                                <p class="text-xs text-muted-foreground">of {{ stats.storage_limit }}</p>
+                                <p class="text-sm font-bold text-foreground leading-tight">{{ storageUsed }}</p>
+                                <p class="text-xs text-muted-foreground mt-0.5">of {{ storageLimit }}</p>
                             </div>
-                            <div class="flex flex-col gap-1.5 mt-1">
-                                <div class="flex items-center gap-1.5">
-                                    <span class="inline-block h-2 w-2 rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 shrink-0" />
+                            <div class="flex flex-col gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2.5 w-2.5 rounded-full shrink-0" style="background: linear-gradient(135deg,#7B2FFF,#00C6FF)" />
                                     <span class="text-xs text-muted-foreground">Used</span>
                                 </div>
-                                <div class="flex items-center gap-1.5">
-                                    <span class="inline-block h-2 w-2 rounded-full bg-muted shrink-0" />
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2.5 w-2.5 rounded-full shrink-0 bg-gray-200 dark:bg-gray-700" />
                                     <span class="text-xs text-muted-foreground">Free</span>
                                 </div>
                             </div>
@@ -176,12 +215,17 @@ const usedDash = computed(() => {
                 >
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Active Links</span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 text-lg">🔗</span>
+                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                            </svg>
+                        </span>
                     </div>
                     <span class="text-5xl font-bold tabular-nums text-foreground leading-none">{{ animatedLinks }}</span>
                     <Link
                         href="/shared-links"
-                        class="mt-auto text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors inline-flex items-center gap-1"
+                        class="mt-auto text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
                     >
                         Manage links →
                     </Link>
@@ -196,10 +240,7 @@ const usedDash = computed(() => {
             >
                 <div class="mb-5 flex items-center justify-between">
                     <h2 class="text-base font-semibold text-foreground">Recent Uploads</h2>
-                    <Link
-                        href="/images"
-                        class="text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors"
-                    >
+                    <Link href="/images" class="text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors">
                         View all →
                     </Link>
                 </div>
@@ -229,7 +270,13 @@ const usedDash = computed(() => {
                 </div>
 
                 <div v-else class="flex flex-col items-center justify-center py-16 text-center">
-                    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-3xl">📸</div>
+                    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                    </div>
                     <p class="font-medium text-foreground mb-1">No images yet</p>
                     <p class="text-sm text-muted-foreground mb-4">Start by uploading your first file.</p>
                     <Link
@@ -246,7 +293,6 @@ const usedDash = computed(() => {
 </template>
 
 <style scoped>
-/* Banner slide-in */
 .banner-in {
     animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
@@ -255,7 +301,6 @@ const usedDash = computed(() => {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Cards */
 .card-in {
     animation: fadeUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
@@ -264,7 +309,6 @@ const usedDash = computed(() => {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Image tiles */
 .tile-in {
     animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
@@ -273,7 +317,6 @@ const usedDash = computed(() => {
     to   { opacity: 1; transform: scale(1); }
 }
 
-/* Card hover lift */
 .stat-card {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
