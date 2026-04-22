@@ -6,12 +6,18 @@ import type { BreadcrumbItem } from '@/types';
 import { ref, onMounted, computed } from 'vue';
 
 const props = defineProps<{
-    user: any;
+    user: {
+        id: number;
+        name: string;
+        email: string;
+        avatar: string;
+        storage_used_human: string;
+        storage_limit: number;
+        storage_percent: number;
+    };
     recentImages: { data: any[] };
     stats: {
         total_images: number;
-        storage_used: string | number;
-        storage_limit: string | number;
         storage_percent: number;
         shared_links: number;
     };
@@ -19,21 +25,19 @@ const props = defineProps<{
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: dashboard() }];
 
-// ── Storage formatter ──────────────────────────────────────────────
-// Handles raw bytes (number) OR already-formatted strings ("667.81 KB")
-function formatBytes(value: string | number): string {
-    // Already a formatted string (contains letters)?
-    if (typeof value === 'string' && /[a-zA-Z]/.test(value)) return value;
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(num) || num === 0) return '0 B';
+// ── Storage display ────────────────────────────────────────────────
+// storage_used_human comes pre-formatted from the Laravel model accessor.
+// storage_limit is raw bytes from the plan — format it here.
+function formatBytes(bytes: number): string {
+    if (!bytes || bytes === 0) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.min(Math.floor(Math.log(num) / Math.log(1024)), units.length - 1);
-    const val = num / Math.pow(1024, i);
-    return `${val % 1 === 0 ? val : val.toFixed(2)} ${units[i]}`;
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const val = bytes / Math.pow(1024, i);
+    return `${Number.isInteger(val) ? val : val.toFixed(2)} ${units[i]}`;
 }
 
-const storageUsed  = computed(() => formatBytes(props.stats.storage_used));
-const storageLimit = computed(() => formatBytes(props.stats.storage_limit));
+const storageUsed  = computed(() => props.user.storage_used_human);
+const storageLimit = computed(() => formatBytes(props.user.storage_limit));
 
 // ── Animated counters ──────────────────────────────────────────────
 const animatedImages  = ref(0);
@@ -57,7 +61,7 @@ onMounted(() => {
         mounted.value = true;
         animateCounter(props.stats.total_images,    v => animatedImages.value  = v);
         animateCounter(props.stats.shared_links,    v => animatedLinks.value   = v);
-        animateCounter(props.stats.storage_percent, v => animatedPercent.value = v, 1400);
+        animateCounter(props.user.storage_percent, v => animatedPercent.value = v, 1400);
     }, 100);
 });
 
@@ -92,9 +96,12 @@ const usedDash = computed(() => {
                 <div class="pointer-events-none absolute -bottom-10 right-28 h-32 w-32 rounded-full bg-white/10" />
                 <div class="pointer-events-none absolute right-64 -top-6 h-20 w-20 rounded-full bg-white/5" />
 
-                <p class="text-sm font-medium text-white/70 mb-1">Welcome back</p>
-                <h1 class="text-2xl font-bold text-white tracking-tight">{{ user.name }} 👋</h1>
-                <p class="mt-1 text-sm text-white/60">Here's what's happening with your files today.</p>
+                <p class="text-base font-medium text-white/70 mb-1">Welcome back</p>
+                <h1 class="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                    {{ user?.name ?? 'there' }}
+                    <span class="wave-hand inline-block" aria-hidden="true">👋</span>
+                </h1>
+                <p class="mt-2 text-sm text-white/60">Here's what's happening with your files today.</p>
             </div>
 
             <!-- ── Stat cards ──────────────────────────────────────── -->
@@ -107,7 +114,7 @@ const usedDash = computed(() => {
                     style="animation-delay: 0.05s"
                 >
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total Images</span>
+                        <span class="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Total Images</span>
                         <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -133,7 +140,7 @@ const usedDash = computed(() => {
                     style="animation-delay: 0.12s"
                 >
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Storage</span>
+                        <span class="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Storage</span>
                         <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <ellipse cx="12" cy="5" rx="9" ry="3"/>
@@ -182,25 +189,25 @@ const usedDash = computed(() => {
                             </svg>
                             <!-- centre label -->
                             <div class="absolute inset-0 flex flex-col items-center justify-center" style="pointer-events:none">
-                                <span class="text-xl font-bold tabular-nums text-foreground leading-none">{{ animatedPercent }}%</span>
-                                <span class="text-[11px] text-muted-foreground mt-0.5">used</span>
+                                <span class="text-2xl font-bold tabular-nums text-foreground leading-none">{{ animatedPercent }}%</span>
+                                <span class="text-xs text-muted-foreground mt-1">used</span>
                             </div>
                         </div>
 
                         <!-- Storage legend -->
                         <div class="flex flex-col gap-3 min-w-0">
                             <div>
-                                <p class="text-sm font-bold text-foreground leading-tight">{{ storageUsed }}</p>
-                                <p class="text-xs text-muted-foreground mt-0.5">of {{ storageLimit }}</p>
+                                <p class="text-base font-bold text-foreground leading-tight">{{ storageUsed }}</p>
+                                <p class="text-sm text-muted-foreground mt-0.5">of {{ storageLimit }}</p>
                             </div>
                             <div class="flex flex-col gap-2">
                                 <div class="flex items-center gap-2">
                                     <span class="h-2.5 w-2.5 rounded-full shrink-0" style="background: linear-gradient(135deg,#7B2FFF,#00C6FF)" />
-                                    <span class="text-xs text-muted-foreground">Used</span>
+                                    <span class="text-sm text-muted-foreground">Used</span>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <span class="h-2.5 w-2.5 rounded-full shrink-0 bg-gray-200 dark:bg-gray-700" />
-                                    <span class="text-xs text-muted-foreground">Free</span>
+                                    <span class="text-sm text-muted-foreground">Free</span>
                                 </div>
                             </div>
                         </div>
@@ -214,7 +221,7 @@ const usedDash = computed(() => {
                     style="animation-delay: 0.19s"
                 >
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Active Links</span>
+                        <span class="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Active Links</span>
                         <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
@@ -225,7 +232,7 @@ const usedDash = computed(() => {
                     <span class="text-5xl font-bold tabular-nums text-foreground leading-none">{{ animatedLinks }}</span>
                     <Link
                         href="/shared-links"
-                        class="mt-auto text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+                        class="mt-auto text-sm font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
                     >
                         Manage links →
                     </Link>
@@ -239,8 +246,8 @@ const usedDash = computed(() => {
                 style="animation-delay: 0.28s"
             >
                 <div class="mb-5 flex items-center justify-between">
-                    <h2 class="text-base font-semibold text-foreground">Recent Uploads</h2>
-                    <Link href="/images" class="text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors">
+                    <h2 class="text-lg font-semibold text-foreground">Recent Uploads</h2>
+                    <Link href="/images" class="text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors">
                         View all →
                     </Link>
                 </div>
@@ -323,5 +330,21 @@ const usedDash = computed(() => {
 .stat-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 12px 32px -8px rgba(123, 47, 255, 0.18);
+}
+
+/* Waving hand */
+.wave-hand {
+    transform-origin: 70% 70%;
+    animation: wave 2.2s ease-in-out 0.6s 3;
+}
+@keyframes wave {
+    0%   { transform: rotate(0deg); }
+    10%  { transform: rotate(14deg); }
+    20%  { transform: rotate(-8deg); }
+    30%  { transform: rotate(14deg); }
+    40%  { transform: rotate(-4deg); }
+    50%  { transform: rotate(10deg); }
+    60%  { transform: rotate(0deg); }
+    100% { transform: rotate(0deg); }
 }
 </style>

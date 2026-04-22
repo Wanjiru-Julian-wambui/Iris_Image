@@ -20,14 +20,15 @@ class DashboardController extends Controller
             ->get();
 
         return Inertia::render('Dashboard', [
-            'user'          => new UserResource($user),
-            'recentImages'  => ImageResource::collection($images),
-            'stats'         => [
-                'total_images'   => $request->user()->images()->count(),
-                'storage_used'   => $request->user()->storage_used,
-                'storage_limit'  => $user->plan?->storage_limit ?? config('iris.plans.free.storage_limit'),
-                'storage_percent'=> $request->user()->storage_percent,
-                'shared_links'   => $request->user()->sharedLinks()->active()->count(),
+            // UserResource already exposes: name, email, avatar, storage_used_human,
+            // storage_limit (raw bytes from plan), storage_percent
+            'user'         => new UserResource($user),
+
+            'recentImages' => ImageResource::collection($images),
+
+            'stats'        => [
+                'total_images' => $request->user()->images()->count(),
+                'shared_links' => $request->user()->sharedLinks()->active()->count(),
             ],
         ]);
     }
