@@ -139,17 +139,12 @@ const stats = [
         >
             <!-- Logo -->
             <Link href="/" class="flex items-center gap-2.5 group select-none">
-                <div class="relative h-8 w-8">
-                    <div class="logo-pulse absolute inset-[-3px] rounded-full opacity-60"
+                <div class="relative h-9 w-9">
+                    <div class="logo-pulse absolute inset-[-3px] rounded-full opacity-50"
                         style="background: conic-gradient(from 0deg, #8B5CF6, #06B6D4, #8B5CF6)"></div>
-                    <div class="relative h-8 w-8 rounded-full flex items-center justify-center z-10"
-                        style="background: linear-gradient(135deg, #6D28D9 0%, #0891B2 100%)">
-                        <!-- Iris/eye icon — properly formed -->
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                            <circle cx="12" cy="12" r="3" fill="white" stroke="none"/>
-                        </svg>
-                    </div>
+                    <img src="/favicon.png" alt="Iris Logo"
+                        class="relative h-9 w-9 rounded-full object-cover z-10 group-hover:scale-105 transition-transform duration-300"
+                        style="box-shadow: 0 0 0 2px rgba(139,92,246,0.3)" />
                 </div>
                 <span class="text-[18px] font-bold tracking-[-0.03em]" style="font-family:'Instrument Serif',serif; font-style:italic">Iris</span>
             </Link>
@@ -548,13 +543,7 @@ const stats = [
         <footer class="border-t px-8 lg:px-14 py-8 flex flex-col md:flex-row items-center justify-between gap-5 text-sm"
             :class="isDark ? 'border-white/[0.06] bg-[#050311] text-white/22' : 'border-slate-100 bg-white text-slate-400'">
             <div class="flex items-center gap-2.5">
-                <div class="h-5 w-5 rounded-full flex items-center justify-center relative overflow-hidden"
-                    style="background:linear-gradient(135deg,#6D28D9,#0891B2)">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="2.5" fill="white" stroke="none"/>
-                    </svg>
-                </div>
+                <img src="/favicon.png" alt="Iris" class="h-6 w-6 rounded-full object-cover opacity-60" />
                 <span class="font-bold text-sm italic" style="font-family:'Instrument Serif',serif"
                     :class="isDark ? 'text-white/40' : 'text-slate-500'">Iris</span>
                 <span class="text-[11px]">© {{ new Date().getFullYear() }}</span>
