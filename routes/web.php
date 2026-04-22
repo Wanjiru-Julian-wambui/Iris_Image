@@ -93,26 +93,37 @@ require __DIR__.'/admin.php';
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
 
-Route::get('/debug-upload-error', function () {
-    try {
-        $disk = Storage::disk(config('filesystems.default'));
-        $disk->put('test.txt', 'hello');
-        $url = $disk->url('test.txt');
-        $disk->delete('test.txt');
-        return [
-            'status'   => 'success',
-            'disk'     => config('filesystems.default'),
-            'test_url' => $url,
-            'bucket'   => env('AWS_BUCKET'),
-            'endpoint' => env('AWS_ENDPOINT_URL_S3'),
-            'region'   => env('AWS_DEFAULT_REGION'),
-            'key_set'  => ! empty(env('AWS_ACCESS_KEY_ID')),
-        ];
-    } catch (\Exception $e) {
-        return [
-            'status' => 'error',
-            'error'  => $e->getMessage(),
-            'disk'   => config('filesystems.default'),
-        ];
+Route::get('/debug-image/{id}', function ($id) {
+    $image = \App\Models\Image::find($id);
+    return [
+        'path'           => $image->path,
+        'url_generated'  => $image->url,
+        'disk'           => config('filesystems.default'),
+        's3_exists'      => \Illuminate\Support\Facades\Storage::disk('s3')->exists($image->path),
+    ];
+});
+
+Route::get('/migrate-images-to-s3', function () {
+    $images = \App\Models\Image::all();
+    $migrated = 0;
+
+    foreach ($images as $image) {
+        // Check if already on S3
+        if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($image->path)) {
+            continue;
+        }
+
+        // Check if exists locally
+        $localPath = \Illuminate\Support\Facades\Storage::disk('public')->path($image->path);
+        if (!file_exists($localPath)) {
+            continue; // Can't migrate, file is gone
+        }
+
+        // Copy to S3
+        $contents = file_get_contents($localPath);
+        \Illuminate\Support\Facades\Storage::disk('s3')->put($image->path, $contents, 'public');
+        $migrated++;
     }
+
+    return "Migrated {$migrated} images to S3.";
 })->middleware('auth');
