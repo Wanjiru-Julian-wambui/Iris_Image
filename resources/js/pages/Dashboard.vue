@@ -3,7 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 
 const props = defineProps<{
     user: {
@@ -24,6 +24,12 @@ const props = defineProps<{
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: dashboard() }];
+
+// ── Dark mode detection ────────────────────────────────────────────
+const isDark = ref(document.documentElement.classList.contains('dark'));
+const darkObserver = new MutationObserver(() => {
+    isDark.value = document.documentElement.classList.contains('dark');
+});
 
 // ── Storage display ────────────────────────────────────────────────
 // storage_used_human comes pre-formatted from the Laravel model accessor.
@@ -64,6 +70,8 @@ onMounted(() => {
         animateCounter(props.user.storage_percent ?? 0, v => animatedPercent.value = v, 1400);
     }, 100);
 });
+
+onUnmounted(() => darkObserver.disconnect());
 
 // ── Donut chart ────────────────────────────────────────────────────
 // Random unique ID prevents scoped-CSS from mangling the gradient reference
@@ -109,13 +117,13 @@ const usedDash = computed(() => {
 
                 <!-- Total images -->
                 <div
-                    class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-4"
+                    class="stat-card rounded-2xl border border-border dark:border-white/8 bg-card p-6 flex flex-col gap-4"
                     :class="mounted ? 'card-in' : 'opacity-0'"
                     style="animation-delay: 0.05s"
                 >
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Total Images</span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15 dark:bg-violet-500/20">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                                 <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -124,7 +132,7 @@ const usedDash = computed(() => {
                         </span>
                     </div>
                     <span class="text-5xl font-bold tabular-nums text-foreground leading-none">{{ animatedImages }}</span>
-                    <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden mt-auto">
+                    <div class="progress-track h-1.5 w-full rounded-full bg-muted dark:bg-white/8 overflow-hidden mt-auto">
                         <div
                             class="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-400"
                             style="transition: width 1.2s cubic-bezier(0.34,1.56,0.64,1)"
@@ -135,13 +143,13 @@ const usedDash = computed(() => {
 
                 <!-- Storage donut -->
                 <div
-                    class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-4"
+                    class="stat-card rounded-2xl border border-border dark:border-white/8 bg-card p-6 flex flex-col gap-4"
                     :class="mounted ? 'card-in' : 'opacity-0'"
                     style="animation-delay: 0.12s"
                 >
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Storage</span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15 dark:bg-cyan-500/20">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <ellipse cx="12" cy="5" rx="9" ry="3"/>
                                 <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
@@ -173,7 +181,7 @@ const usedDash = computed(() => {
                                 <circle
                                     :cx="SIZE / 2" :cy="SIZE / 2" :r="R"
                                     fill="none"
-                                    stroke="#e5e7eb"
+                                    :stroke="isDark ? '#2d2d3a' : '#e5e7eb'"
                                     :stroke-width="STROKE"
                                 />
                                 <!-- filled arc -->
@@ -206,7 +214,7 @@ const usedDash = computed(() => {
                                     <span class="text-sm text-muted-foreground">Used</span>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="h-2.5 w-2.5 rounded-full shrink-0 bg-gray-200 dark:bg-gray-700" />
+                                    <span class="h-2.5 w-2.5 rounded-full shrink-0 bg-gray-300 dark:bg-white/15" />
                                     <span class="text-sm text-muted-foreground">Free</span>
                                 </div>
                             </div>
@@ -216,13 +224,13 @@ const usedDash = computed(() => {
 
                 <!-- Active links -->
                 <div
-                    class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-4"
+                    class="stat-card rounded-2xl border border-border dark:border-white/8 bg-card p-6 flex flex-col gap-4"
                     :class="mounted ? 'card-in' : 'opacity-0'"
                     style="animation-delay: 0.19s"
                 >
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Active Links</span>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 dark:bg-emerald-500/20">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
@@ -241,7 +249,7 @@ const usedDash = computed(() => {
 
             <!-- ── Recent uploads ──────────────────────────────────── -->
             <div
-                class="rounded-2xl border border-border bg-card p-6"
+                class="rounded-2xl border border-border dark:border-white/8 bg-card p-6"
                 :class="mounted ? 'card-in' : 'opacity-0'"
                 style="animation-delay: 0.28s"
             >
@@ -330,6 +338,16 @@ const usedDash = computed(() => {
 .stat-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 12px 32px -8px rgba(123, 47, 255, 0.18);
+}
+
+/* Dark mode — richer glow on hover */
+:global(.dark) .stat-card:hover {
+    box-shadow: 0 12px 40px -8px rgba(123, 47, 255, 0.35);
+}
+
+/* Progress bar track — dark bg */
+:global(.dark) .progress-track {
+    background: rgba(255,255,255,0.08);
 }
 
 /* Waving hand */
