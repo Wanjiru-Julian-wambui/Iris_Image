@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\ImageResource;
-use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,15 +19,26 @@ class DashboardController extends Controller
             ->get();
 
         return Inertia::render('Dashboard', [
-            // UserResource already exposes: name, email, avatar, storage_used_human,
-            // storage_limit (raw bytes from plan), storage_percent
-            'user'         => new UserResource($user),
+            // Pass user fields directly — avoids the { data: {...} } wrapper
+            // that JsonResource adds, which breaks Vue prop destructuring.
+            'user' => [
+                'id'                 => $user->id,
+                'name'               => $user->name,
+                'email'              => $user->email,
+                'avatar'             => $user->avatar_url,
+                'is_admin'           => $user->is_admin,
+                'storage_used'       => $user->storage_used,
+                'storage_used_human' => $user->storage_used_human,
+                'storage_limit'      => $user->plan?->storage_limit
+                                        ?? config('iris.plans.free.storage_limit'),
+                'storage_percent'    => $user->storage_percent,
+            ],
 
             'recentImages' => ImageResource::collection($images),
 
-            'stats'        => [
-                'total_images' => $request->user()->images()->count(),
-                'shared_links' => $request->user()->sharedLinks()->active()->count(),
+            'stats' => [
+                'total_images' => $user->images()->count(),
+                'shared_links' => $user->sharedLinks()->active()->count(),
             ],
         ]);
     }

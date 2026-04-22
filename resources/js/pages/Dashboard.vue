@@ -36,8 +36,8 @@ function formatBytes(bytes: number): string {
     return `${Number.isInteger(val) ? val : val.toFixed(2)} ${units[i]}`;
 }
 
-const storageUsed  = computed(() => props.user.storage_used_human);
-const storageLimit = computed(() => formatBytes(props.user.storage_limit));
+const storageUsed  = computed(() => props.user.storage_used_human ?? '0 B');
+const storageLimit = computed(() => formatBytes(props.user.storage_limit ?? 0));
 
 // ── Animated counters ──────────────────────────────────────────────
 const animatedImages  = ref(0);
@@ -61,7 +61,7 @@ onMounted(() => {
         mounted.value = true;
         animateCounter(props.stats.total_images,    v => animatedImages.value  = v);
         animateCounter(props.stats.shared_links,    v => animatedLinks.value   = v);
-        animateCounter(props.user.storage_percent, v => animatedPercent.value = v, 1400);
+        animateCounter(props.user.storage_percent ?? 0, v => animatedPercent.value = v, 1400);
     }, 100);
 });
 
@@ -98,8 +98,8 @@ const usedDash = computed(() => {
 
                 <p class="text-base font-medium text-white/70 mb-1">Welcome back</p>
                 <h1 class="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                    {{ user?.name ?? 'there' }}
-                    <span class="wave-hand inline-block" aria-hidden="true">👋</span>
+                    {{ props.user?.name ?? 'there' }}
+                    <span style="display:inline-block;transform-origin:70% 70%;animation:waveHand 2.2s ease-in-out 0.6s 3 both" aria-hidden="true">👋</span>
                 </h1>
                 <p class="mt-2 text-sm text-white/60">Here's what's happening with your files today.</p>
             </div>
@@ -333,11 +333,12 @@ const usedDash = computed(() => {
 }
 
 /* Waving hand */
-.wave-hand {
-    transform-origin: 70% 70%;
-    animation: wave 2.2s ease-in-out 0.6s 3;
-}
-@keyframes wave {
+
+</style>
+
+<style>
+/* Wave keyframe — must be global (not scoped) so inline animation: ref works */
+@keyframes waveHand {
     0%   { transform: rotate(0deg); }
     10%  { transform: rotate(14deg); }
     20%  { transform: rotate(-8deg); }
