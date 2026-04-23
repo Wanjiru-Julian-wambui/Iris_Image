@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, Clock, Copy, Download, Eye, Lock, Share2, Shield, Trash2 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ArrowLeft, Check, Clock, Code, Copy, Download, Eye, Link2, Lock, Share2, Shield, Trash2 } from 'lucide-vue-next';
+import { ref, computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +35,33 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: props.image.name, href: `/images/${props.image.id}` },
 ];
 
-// ─── Delete ───────────────────────────────────────────────────────────────────
+// ── URL / embed copy ──────────────────────────────────────────────
+type CopyTarget = 'url' | 'html' | 'markdown' | 'bbcode';
+const copyStates = ref<Record<CopyTarget, boolean>>({
+    url: false, html: false, markdown: false, bbcode: false,
+});
+
+const embedCodes = computed(() => ({
+    url:      props.image.url,
+    html:     `<img src="${props.image.url}" alt="${props.image.name}" />`,
+    markdown: `![${props.image.name}](${props.image.url})`,
+    bbcode:   `[img]${props.image.url}[/img]`,
+}));
+
+function copyEmbed(type: CopyTarget) {
+    navigator.clipboard.writeText(embedCodes.value[type]);
+    copyStates.value[type] = true;
+    setTimeout(() => { copyStates.value[type] = false; }, 2000);
+}
+
+const embedTypes: { key: CopyTarget; label: string; desc: string }[] = [
+    { key: 'url',      label: 'Direct URL',  desc: 'Raw image link'         },
+    { key: 'html',     label: 'HTML',        desc: '<img> tag'              },
+    { key: 'markdown', label: 'Markdown',    desc: '![alt](url)'            },
+    { key: 'bbcode',   label: 'BBCode',      desc: '[img] for forums'       },
+];
+
+// ── Delete ────────────────────────────────────────────────────────
 const showDeleteDialog = ref(false);
 const deleting         = ref(false);
 
@@ -46,14 +72,14 @@ function deleteImage() {
     });
 }
 
-// ─── Share ────────────────────────────────────────────────────────────────────
+// ── Share ─────────────────────────────────────────────────────────
 const showShareDialog = ref(false);
 const expiresIn       = ref('24');
 const sharePassword   = ref('');
 const usePassword     = ref(false);
 const sharing         = ref(false);
 const shareUrl        = ref('');
-const copied          = ref(false);
+const shareCopied     = ref(false);
 
 function createShareLink() {
     sharing.value = true;
@@ -70,13 +96,13 @@ function createShareLink() {
     });
 }
 
-function copyUrl() {
+function copyShareUrl() {
     navigator.clipboard.writeText(shareUrl.value);
-    copied.value = true;
-    setTimeout(() => { copied.value = false; }, 2000);
+    shareCopied.value = true;
+    setTimeout(() => { shareCopied.value = false; }, 2000);
 }
 
-// ─── Watermark download ───────────────────────────────────────────────────────
+// ── Watermark download ────────────────────────────────────────────
 const useWatermark  = ref(false);
 const wmText        = ref('Iris');
 const wmPosition    = ref('bottom-right');
@@ -93,7 +119,6 @@ const positionOptions = [
 
 async function download() {
     downloading.value = true;
-
     const params = new URLSearchParams();
     if (useWatermark.value) {
         params.set('watermark', '1');
@@ -101,9 +126,7 @@ async function download() {
         params.set('position',  wmPosition.value);
         params.set('opacity',   wmOpacity.value);
     }
-
     const url = `/images/${props.image.id}/download${params.size ? '?' + params : ''}`;
-
     try {
         const token = decodeURIComponent(
             document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''
@@ -147,8 +170,8 @@ async function download() {
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Image -->
-                <div class="lg:col-span-2">
+                <!-- Image preview -->
+                <div class="lg:col-span-2 space-y-4">
                     <div class="rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center min-h-[300px]">
                         <img
                             :src="image.url"
@@ -156,9 +179,49 @@ async function download() {
                             class="max-w-full max-h-[600px] object-contain"
                         />
                     </div>
+
+                    <!-- ── URL / Embed card ─────────────────────────────── -->
+                    <div class="rounded-xl border border-border bg-card p-5 space-y-4">
+                        <div class="flex items-center gap-2">
+                            <Link2 class="h-4 w-4 text-violet-400" />
+                            <h3 class="text-sm font-semibold text-foreground">Direct URL &amp; Embed codes</h3>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div
+                                v-for="type in embedTypes"
+                                :key="type.key"
+                                class="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5"
+                            >
+                                <div class="min-w-[80px]">
+                                    <p class="text-xs font-semibold text-foreground">{{ type.label }}</p>
+                                    <p class="text-[10px] text-muted-foreground">{{ type.desc }}</p>
+                                </div>
+                                <code class="flex-1 truncate text-xs font-mono text-muted-foreground">
+                                    {{ embedCodes[type.key] }}
+                                </code>
+                                <button
+                                    @click="copyEmbed(type.key)"
+                                    class="shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all"
+                                    :class="copyStates[type.key]
+                                        ? 'bg-emerald-500/15 text-emerald-400'
+                                        : 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20'"
+                                >
+                                    <Check v-if="copyStates[type.key]" class="h-3 w-3" />
+                                    <Copy v-else class="h-3 w-3" />
+                                    {{ copyStates[type.key] ? 'Copied!' : 'Copy' }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-muted-foreground">
+                            These are permanent direct links to your image hosted on Tigris storage.
+                            Paste them anywhere — websites, docs, forums, chat apps.
+                        </p>
+                    </div>
                 </div>
 
-                <!-- Info + Download -->
+                <!-- Sidebar info -->
                 <div class="space-y-4">
                     <div>
                         <h1 class="text-xl font-bold tracking-tight break-all">{{ image.name }}</h1>
@@ -199,7 +262,6 @@ async function download() {
                     <div class="rounded-xl border border-border bg-card p-4 space-y-4">
                         <h3 class="text-sm font-semibold">Download</h3>
 
-                        <!-- Watermark toggle -->
                         <div class="flex items-center justify-between">
                             <div>
                                 <Label class="text-sm font-medium">Add watermark</Label>
@@ -208,7 +270,6 @@ async function download() {
                             <Switch v-model:checked="useWatermark" />
                         </div>
 
-                        <!-- Watermark options -->
                         <Transition
                             enter-active-class="transition-all duration-200"
                             enter-from-class="opacity-0 -translate-y-1"
@@ -250,10 +311,7 @@ async function download() {
                                     </div>
                                     <input
                                         v-model="wmOpacity"
-                                        type="range"
-                                        min="10"
-                                        max="100"
-                                        step="5"
+                                        type="range" min="10" max="100" step="5"
                                         class="w-full accent-[#7B2FFF]"
                                     />
                                 </div>
@@ -270,7 +328,7 @@ async function download() {
                         </Button>
                     </div>
 
-                    <!-- Shared links -->
+                    <!-- Active shared links -->
                     <div v-if="image.shared_links?.length">
                         <h3 class="text-sm font-semibold mb-2">Active shared links</h3>
                         <div class="space-y-2">
@@ -348,11 +406,12 @@ async function download() {
                     <p class="text-sm text-muted-foreground">Your link is ready. Copy it and share.</p>
                     <div class="flex gap-2">
                         <Input :value="shareUrl" readonly class="font-mono text-xs" />
-                        <Button variant="outline" size="icon" @click="copyUrl">
-                            <Copy class="h-4 w-4" />
+                        <Button variant="outline" size="icon" @click="copyShareUrl">
+                            <Check v-if="shareCopied" class="h-4 w-4 text-emerald-500" />
+                            <Copy v-else class="h-4 w-4" />
                         </Button>
                     </div>
-                    <p v-if="copied" class="text-xs text-green-600">Copied to clipboard!</p>
+                    <p v-if="shareCopied" class="text-xs text-emerald-500">Copied to clipboard!</p>
                 </div>
 
                 <DialogFooter>

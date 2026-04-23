@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import {
     CreditCard,
     Image as ImageIcon,
+    Key,
     LayoutGrid,
     Link as LinkIcon,
     Mail,
@@ -27,49 +28,22 @@ import {
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
-const page = usePage();
-const user = computed(() => (page.props.auth as any)?.user ?? null);
+const page    = usePage();
+const user    = computed(() => (page.props.auth as any)?.user ?? null);
 const isAdmin = computed(() => user.value?.is_admin === true);
 
 const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Images',
-        href: '/images',
-        icon: Images,
-    },
-    {
-        title: 'Gallery',
-        href: '/gallery',
-        icon: ImageIcon,
-    },
-    {
-        title: 'Shared Links',
-        href: '/shared-links',
-        icon: LinkIcon,
-    },
-    {
-        title: 'Plans',
-        href: '/plans',
-        icon: CreditCard,
-    },
+    { title: 'Dashboard',    href: dashboard(),        icon: LayoutGrid  },
+    { title: 'Images',       href: '/images',          icon: Images      },
+    { title: 'Gallery',      href: '/gallery',         icon: ImageIcon   },
+    { title: 'Shared Links', href: '/shared-links',    icon: LinkIcon    },
+    { title: 'Plans',        href: '/plans',           icon: CreditCard  },
+    { title: 'API Keys',     href: '/settings/api-keys', icon: Key       },
 ];
 
 const adminNavItems: NavItem[] = [
-    {
-        title: 'Admin',
-        href: '/admin',
-        icon: Shield,
-    },
-    {
-        title: 'Invitations',
-        href: '/invitations',
-        icon: Mail,
-    },
+    { title: 'Admin',       href: '/admin',       icon: Shield },
+    { title: 'Invitations', href: '/invitations', icon: Mail   },
 ];
 </script>
 
@@ -97,7 +71,6 @@ const adminNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-            <!-- Storage bar — hidden when sidebar is collapsed to icon -->
             <div
                 v-if="user"
                 class="px-3 pb-2 group-data-[collapsible=icon]:hidden"
