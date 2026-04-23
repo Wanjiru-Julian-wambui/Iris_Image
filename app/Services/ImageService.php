@@ -14,7 +14,6 @@ class ImageService
         protected StorageService           $storageService,
         protected ExifService              $exifService,
         protected DuplicateDetectorService $duplicateDetector,
-        protected CloudinaryService        $cloudinary,
     ) {}
 
     /**
@@ -52,7 +51,7 @@ class ImageService
     }
 
     /**
-     * Upload a single file, routing to Cloudinary or disk storage based on config.
+     * Upload a single file to the configured filesystem disk (S3/Tigris on production).
      */
     public function upload(
         UploadedFile $file,
@@ -70,8 +69,10 @@ class ImageService
         );
 
         return DB::transaction(function () use ($file, $user, $stripExif, $isPrivate, $hash) {
+            // Get dimensions BEFORE upload while the file is still local
             [$width, $height] = $this->getDimensions($file);
 
+            // Strip EXIF on the local temp file BEFORE uploading
             $exifStripped = false;
             if ($stripExif) {
                 $localPath = $file->getRealPath();
@@ -82,86 +83,34 @@ class ImageService
 
             $hash = $hash ?? hash_file('sha256', $file->getRealPath());
 
-            // ── Route to Cloudinary or disk ───────────────────────────────────
-            if ($this->cloudinary->isEnabled()) {
-                return $this->uploadViaCloudinary(
-                    $file, $user, $hash, $width, $height, $exifStripped, $isPrivate
-                );
+            // Upload to configured disk (s3 on production, public locally)
+            $path = $this->storageService->store($file, $user);
+
+            // Verify upload using Storage facade (works with S3)
+            $disk = config('filesystems.default');
+            if (!Storage::disk($disk)->exists($path)) {
+                throw new \Exception("File missing after upload: {$path}");
             }
 
-            return $this->uploadViaDisk(
-                $file, $user, $hash, $width, $height, $exifStripped, $isPrivate
-            );
+            $image = Image::create([
+                'user_id'       => $user->id,
+                'name'          => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
+                'original_name' => $file->getClientOriginalName(),
+                'path'          => $path,
+                'mime_type'     => $file->getMimeType(),
+                'extension'     => strtolower($file->getClientOriginalExtension()),
+                'size'          => $file->getSize(),
+                'width'         => $width,
+                'height'        => $height,
+                'hash'          => $hash,
+                'exif_stripped' => $exifStripped,
+                'is_private'    => $isPrivate,
+            ]);
+
+            $user->increment('storage_used', $file->getSize());
+
+            return $image;
         });
-    }
-
-    private function uploadViaDisk(
-        UploadedFile $file,
-        User         $user,
-        string       $hash,
-        int          $width,
-        int          $height,
-        bool         $exifStripped,
-        bool         $isPrivate,
-    ): Image {
-        $path = $this->storageService->store($file, $user);
-
-        $disk = config('iris.storage_disk', 'public');
-        if (!Storage::disk($disk)->exists($path)) {
-            throw new \Exception("File missing after upload: {$path}");
-        }
-
-        $image = Image::create([
-            'user_id'              => $user->id,
-            'name'                 => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
-            'original_name'        => $file->getClientOriginalName(),
-            'path'                 => $path,
-            'cloudinary_public_id' => null,
-            'mime_type'            => $file->getMimeType(),
-            'extension'            => strtolower($file->getClientOriginalExtension()),
-            'size'                 => $file->getSize(),
-            'width'                => $width,
-            'height'               => $height,
-            'hash'                 => $hash,
-            'exif_stripped'        => $exifStripped,
-            'is_private'           => $isPrivate,
-        ]);
-
-        $user->increment('storage_used', $file->getSize());
-
-        return $image;
-    }
-
-    private function uploadViaCloudinary(
-        UploadedFile $file,
-        User         $user,
-        string       $hash,
-        int          $width,
-        int          $height,
-        bool         $exifStripped,
-        bool         $isPrivate,
-    ): Image {
-        $result = $this->cloudinary->upload($file, $user);
-
-        $image = Image::create([
-            'user_id'              => $user->id,
-            'name'                 => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
-            'original_name'        => $file->getClientOriginalName(),
-            'path'                 => $result['public_id'], // store public_id as path
-            'cloudinary_public_id' => $result['public_id'],
-            'mime_type'            => $file->getMimeType(),
-            'extension'            => strtolower($file->getClientOriginalExtension()),
-            'size'                 => $result['bytes'] ?? $file->getSize(),
-            'width'                => $result['width']  ?? $width,
-            'height'               => $result['height'] ?? $height,
-            'hash'                 => $hash,
-            'exif_stripped'        => $exifStripped,
-            'is_private'           => $isPrivate,
-        ]);
-
-        $user->increment('storage_used', $image->size);
-
-        return $image;
     }
 
     /**
@@ -169,12 +118,8 @@ class ImageService
      */
     public function delete(Image $image): void
     {
-        if ($this->cloudinary->isEnabled() && $image->cloudinary_public_id) {
-            $this->cloudinary->delete($image->cloudinary_public_id);
-        } else {
-            $disk = config('iris.storage_disk', 'public');
-            Storage::disk($disk)->delete($image->path);
-        }
+        $disk = config('filesystems.default');
+        Storage::disk($disk)->delete($image->path);
 
         $image->user->decrement('storage_used', $image->size);
         $image->delete();
