@@ -95,34 +95,3 @@ require __DIR__.'/admin.php';
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
 
-Route::get('/debug-image/{id}', function ($id) {
-    $image = \App\Models\Image::find($id);
-    return [
-        'path'          => $image->path,
-        'url_generated' => $image->url,
-        'disk'          => config('filesystems.default'),
-        's3_exists'     => \Illuminate\Support\Facades\Storage::disk('s3')->exists($image->path),
-    ];
-});
-
-Route::get('/migrate-images-to-s3', function () {
-    $images   = \App\Models\Image::all();
-    $migrated = 0;
-
-    foreach ($images as $image) {
-        if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($image->path)) {
-            continue;
-        }
-
-        $localPath = \Illuminate\Support\Facades\Storage::disk('public')->path($image->path);
-        if (!file_exists($localPath)) {
-            continue;
-        }
-
-        $contents = file_get_contents($localPath);
-        \Illuminate\Support\Facades\Storage::disk('s3')->put($image->path, $contents, 'public');
-        $migrated++;
-    }
-
-    return "Migrated {$migrated} images to S3.";
-})->middleware('auth');
