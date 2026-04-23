@@ -15,7 +15,9 @@ const mouseY = ref(0);
 const cursorX = ref(0);
 const cursorY = ref(0);
 
-const onScroll = () => { scrollY.value = window.scrollY; };
+const onScroll = () => {
+    scrollY.value = window.scrollY;
+};
 const onMouse = (e: MouseEvent) => {
     mouseX.value = (e.clientX / window.innerWidth - 0.5) * 30;
     mouseY.value = (e.clientY / window.innerHeight - 0.5) * 30;

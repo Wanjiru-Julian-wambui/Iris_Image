@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Clock, Copy, ExternalLink, Lock, Plus, Trash2 } from 'lucide-vue-next';
+import { ChevronDown, Clock, Copy, ExternalLink, Eye, Lock, Plus, Trash2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -29,8 +29,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const confirmDelete = ref<App.SharedLinkResource | null>(null);
-const deleting = ref(false);
-const copiedId = ref<number | null>(null);
+const deleting      = ref(false);
+const copiedId      = ref<number | null>(null);
+const expandedId    = ref<number | null>(null);
 
 function copyUrl(link: App.SharedLinkResource) {
     navigator.clipboard.writeText(link.url);
@@ -38,12 +39,16 @@ function copyUrl(link: App.SharedLinkResource) {
     setTimeout(() => { copiedId.value = null; }, 2000);
 }
 
+function toggleHistory(id: number) {
+    expandedId.value = expandedId.value === id ? null : id;
+}
+
 function deleteLink() {
     if (!confirmDelete.value) return;
     deleting.value = true;
     router.delete(`/shared-links/${confirmDelete.value.id}`, {
         onFinish: () => {
-            deleting.value = false;
+            deleting.value      = false;
             confirmDelete.value = null;
         },
     });
@@ -102,93 +107,128 @@ function deleteLink() {
                             <th class="px-4 py-3" />
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-border">
-                        <tr
-                            v-for="link in links.data"
-                            :key="link.id"
-                            class="hover:bg-muted/30 transition-colors"
-                        >
-                            <!-- Image thumbnail -->
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-3">
-                                    <div class="size-10 rounded-lg overflow-hidden bg-muted border border-border shrink-0">
-                                        <img
-                                            v-if="link.image?.thumbnail_url"
-                                            :src="link.image.thumbnail_url"
-                                            :alt="link.image.name"
-                                            class="w-full h-full object-cover"
-                                        />
+                    <tbody>
+                        <template v-for="link in links.data" :key="link.id">
+
+                            <!-- Main row -->
+                            <tr class="border-t border-border hover:bg-muted/30 transition-colors">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="size-10 rounded-lg overflow-hidden bg-muted border border-border shrink-0">
+                                            <img
+                                                v-if="link.image?.thumbnail_url"
+                                                :src="link.image.thumbnail_url"
+                                                :alt="link.image.name"
+                                                class="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <span class="font-medium truncate max-w-[140px]">
+                                            {{ link.image?.name ?? '—' }}
+                                        </span>
                                     </div>
-                                    <span class="font-medium truncate max-w-[140px]">
-                                        {{ link.image?.name ?? '—' }}
-                                    </span>
-                                </div>
-                            </td>
+                                </td>
 
-                            <!-- URL -->
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-2">
-                                    <Lock v-if="link.is_password_protected" class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                    <span class="font-mono text-xs text-muted-foreground truncate max-w-[160px]">
-                                        {{ link.url }}
-                                    </span>
-                                </div>
-                            </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        <Lock v-if="link.is_password_protected" class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                        <span class="font-mono text-xs text-muted-foreground truncate max-w-[160px]">
+                                            {{ link.url }}
+                                        </span>
+                                    </div>
+                                </td>
 
-                            <!-- Expires -->
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-1.5 text-muted-foreground">
-                                    <Clock class="h-3.5 w-3.5 shrink-0" />
-                                    <span class="text-xs">
-                                        {{ link.is_expired ? 'Expired' : link.expires_in_human }}
-                                    </span>
-                                </div>
-                            </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-1.5 text-muted-foreground">
+                                        <Clock class="h-3.5 w-3.5 shrink-0" />
+                                        <span class="text-xs">
+                                            {{ link.is_expired ? 'Expired' : link.expires_in_human }}
+                                        </span>
+                                    </div>
+                                </td>
 
-                            <!-- View count -->
-                            <td class="px-4 py-3 text-muted-foreground">
-                                {{ link.view_count }}
-                            </td>
+                                <td class="px-4 py-3 text-muted-foreground">
+                                    {{ link.view_count }}
+                                </td>
 
-                            <!-- Status -->
-                            <td class="px-4 py-3">
-                                <Badge
-                                    :class="link.is_expired
-                                        ? 'bg-muted text-muted-foreground'
-                                        : 'bg-green-500/10 text-green-600 border-green-500/20'"
-                                >
-                                    {{ link.is_expired ? 'Expired' : 'Active' }}
-                                </Badge>
-                            </td>
-
-                            <!-- Actions -->
-                            <td class="px-4 py-3">
-                                <div class="flex items-center justify-end gap-1">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        class="h-8 w-8"
-                                        :disabled="link.is_expired"
-                                        @click="copyUrl(link)"
+                                <td class="px-4 py-3">
+                                    <Badge
+                                        :class="link.is_expired
+                                            ? 'bg-muted text-muted-foreground'
+                                            : 'bg-green-500/10 text-green-600 border-green-500/20'"
                                     >
-                                        <Copy class="h-4 w-4" :class="copiedId === link.id ? 'text-green-500' : ''" />
-                                    </Button>
-                                    <a :href="link.url" target="_blank" rel="noopener noreferrer">
-                                        <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="link.is_expired">
-                                            <ExternalLink class="h-4 w-4" />
+                                        {{ link.is_expired ? 'Expired' : 'Active' }}
+                                    </Badge>
+                                </td>
+
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <!-- View history toggle -->
+                                        <button
+                                            class="flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-[#7B2FFF]/40 transition-colors"
+                                            @click="toggleHistory(link.id)"
+                                        >
+                                            <Eye class="h-3.5 w-3.5" />
+                                            <ChevronDown
+                                                class="h-3 w-3 transition-transform duration-200"
+                                                :class="expandedId === link.id ? 'rotate-180' : ''"
+                                            />
+                                        </button>
+
+                                        <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="link.is_expired" @click="copyUrl(link)">
+                                            <Copy class="h-4 w-4" :class="copiedId === link.id ? 'text-green-500' : ''" />
                                         </Button>
-                                    </a>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        class="h-8 w-8 text-destructive hover:text-destructive"
-                                        @click="confirmDelete = link"
-                                    >
-                                        <Trash2 class="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </td>
-                        </tr>
+                                        <a :href="link.url" target="_blank" rel="noopener noreferrer">
+                                            <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="link.is_expired">
+                                                <ExternalLink class="h-4 w-4" />
+                                            </Button>
+                                        </a>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            class="h-8 w-8 text-destructive hover:text-destructive"
+                                            @click="confirmDelete = link"
+                                        >
+                                            <Trash2 class="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- View history sub-row -->
+                            <tr v-if="expandedId === link.id" class="border-t border-border">
+                                <td colspan="6" class="bg-muted/20 px-4 py-4">
+                                    <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                                        View history
+                                    </p>
+
+                                    <p v-if="!link.views?.length" class="text-xs text-muted-foreground">
+                                        No views recorded yet.
+                                    </p>
+
+                                    <div v-else class="rounded-lg border border-border overflow-hidden">
+                                        <table class="w-full text-xs">
+                                            <thead class="bg-muted/60 border-b border-border">
+                                                <tr>
+                                                    <th class="text-left px-3 py-2 font-medium text-muted-foreground">IP address</th>
+                                                    <th class="text-left px-3 py-2 font-medium text-muted-foreground">Browser</th>
+                                                    <th class="text-left px-3 py-2 font-medium text-muted-foreground">When</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-border">
+                                                <tr v-for="view in link.views" :key="view.id" class="hover:bg-muted/40">
+                                                    <td class="px-3 py-2 font-mono text-muted-foreground">{{ view.masked_ip }}</td>
+                                                    <td class="px-3 py-2 text-muted-foreground">{{ view.browser }}</td>
+                                                    <td class="px-3 py-2 text-muted-foreground">
+                                                        <span :title="view.viewed_at_full">{{ view.viewed_at }}</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+
+                        </template>
                     </tbody>
                 </table>
             </div>

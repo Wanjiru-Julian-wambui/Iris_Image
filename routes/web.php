@@ -29,7 +29,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ----------------------------------------------------------
     // Plan chooser + PayPal endpoints
-    // Outside plan.selected so brand-new users can reach them.
     // ----------------------------------------------------------
     Route::get('/plans/choose',           [PlanController::class, 'choose'])->name('plans.choose');
     Route::post('/plans/select',          [PlanController::class, 'select'])->name('plans.select');
@@ -44,28 +43,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Images — read/delete require plan
-        Route::get('/images',            [ImageController::class, 'index'])->name('images.index');
-        Route::get('/images/create',     [ImageController::class, 'create'])->name('images.create');
-        Route::get('/images/{image}',    [ImageController::class, 'show'])->name('images.show');
-        Route::delete('/images/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
+        // Images
+        Route::get('/images',             [ImageController::class, 'index'])->name('images.index');
+        Route::get('/images/create',      [ImageController::class, 'create'])->name('images.create');
+        Route::get('/images/{image}',     [ImageController::class, 'show'])->name('images.show');
+        Route::delete('/images/{image}',  [ImageController::class, 'destroy'])->name('images.destroy');
 
-        // Gallery — needs a real controller to pass paginated images + filters
+        // ── Phase 3: watermark download ──────────────────────
+        Route::get('/images/{image}/download', [ImageController::class, 'download'])->name('images.download');
+
+        // Gallery
         Route::get('/gallery', [GalleryController::class, 'index'])->name('gallery');
 
         // Shared links
-        Route::get('/shared-links',               [SharedLinkController::class, 'index'])->name('shared-links.index');
-        Route::get('/shared-links/create',        [SharedLinkController::class, 'create'])->name('shared-links.create'); // ← add this
-        Route::post('/shared-links',              [SharedLinkController::class, 'store'])->name('shared-links.store');
-        Route::delete('/shared-links/{sharedLink}', [SharedLinkController::class, 'destroy'])->name('shared-links.destroy');
+        Route::get('/shared-links',                  [SharedLinkController::class, 'index'])->name('shared-links.index');
+        Route::get('/shared-links/create',           [SharedLinkController::class, 'create'])->name('shared-links.create');
+        Route::post('/shared-links',                 [SharedLinkController::class, 'store'])->name('shared-links.store');
+        Route::delete('/shared-links/{sharedLink}',  [SharedLinkController::class, 'destroy'])->name('shared-links.destroy');
 
         // Invitations
-        Route::get('/invitations',        [InvitationController::class, 'index'])->name('invitations.index');
-        Route::get('/invitations/create', [InvitationController::class, 'create'])->name('invitations.create');
-        Route::post('/invitations',       [InvitationController::class, 'store'])->name('invitations.store');
-        Route::delete('/invitations/{invitation}', [InvitationController::class, 'destroy'])->name('invitations.destroy');
+        Route::get('/invitations',                    [InvitationController::class, 'index'])->name('invitations.index');
+        Route::get('/invitations/create',             [InvitationController::class, 'create'])->name('invitations.create');
+        Route::post('/invitations',                   [InvitationController::class, 'store'])->name('invitations.store');
+        Route::delete('/invitations/{invitation}',    [InvitationController::class, 'destroy'])->name('invitations.destroy');
 
-        // Plans — in-app view & change plan, plus admin CRUD
+        // Plans
         Route::get('/plans',             [PlanController::class, 'index'])->name('plans.index');
         Route::get('/plans/create',      [PlanController::class, 'create'])->name('plans.create');
         Route::post('/plans',            [PlanController::class, 'store'])->name('plans.store');
@@ -74,11 +76,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/plans/{plan}',   [PlanController::class, 'destroy'])->name('plans.destroy');
     });
 
-    // Image UPLOAD — auth + storage limit only, never blocked by plan.selected
+    // Image upload — auth + storage limit only
     Route::middleware('storage.limit')->group(function () {
         Route::post('/images', [ImageController::class, 'store'])->name('images.store');
     });
 
+    // ── Phase 3: bulk ZIP download ────────────────────────────
     Route::post('/images/bulk-download', [ImageController::class, 'bulkDownload'])->name('images.bulk-download');
 });
 
@@ -87,8 +90,7 @@ require __DIR__.'/settings.php';
 require __DIR__.'/admin.php';
 
 // ============================================================
-// PUBLIC INVITATION ROUTES
-// Defined LAST so {token} wildcard never matches /invitations/create
+// PUBLIC INVITATION ROUTES (last — wildcard after named paths)
 // ============================================================
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
@@ -96,30 +98,27 @@ Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept
 Route::get('/debug-image/{id}', function ($id) {
     $image = \App\Models\Image::find($id);
     return [
-        'path'           => $image->path,
-        'url_generated'  => $image->url,
-        'disk'           => config('filesystems.default'),
-        's3_exists'      => \Illuminate\Support\Facades\Storage::disk('s3')->exists($image->path),
+        'path'          => $image->path,
+        'url_generated' => $image->url,
+        'disk'          => config('filesystems.default'),
+        's3_exists'     => \Illuminate\Support\Facades\Storage::disk('s3')->exists($image->path),
     ];
 });
 
 Route::get('/migrate-images-to-s3', function () {
-    $images = \App\Models\Image::all();
+    $images   = \App\Models\Image::all();
     $migrated = 0;
 
     foreach ($images as $image) {
-        // Check if already on S3
         if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($image->path)) {
             continue;
         }
 
-        // Check if exists locally
         $localPath = \Illuminate\Support\Facades\Storage::disk('public')->path($image->path);
         if (!file_exists($localPath)) {
-            continue; // Can't migrate, file is gone
+            continue;
         }
 
-        // Copy to S3
         $contents = file_get_contents($localPath);
         \Illuminate\Support\Facades\Storage::disk('s3')->put($image->path, $contents, 'public');
         $migrated++;

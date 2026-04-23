@@ -6,6 +6,7 @@ use App\Http\Requests\SharedLinkRequest;
 use App\Http\Resources\ImageResource;
 use App\Http\Resources\SharedLinkResource;
 use App\Models\SharedLink;
+use App\Models\SharedLinkView;
 use App\Services\SharedLinkService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,7 +20,7 @@ class SharedLinkController extends Controller
     {
         $links = $request->user()
             ->sharedLinks()
-            ->with('image')
+            ->with(['image', 'views'])
             ->latest()
             ->paginate(20);
 
@@ -67,6 +68,14 @@ class SharedLinkController extends Controller
                 'token' => $token,
             ]);
         }
+
+        // Record view
+        SharedLinkView::create([
+            'shared_link_id' => $link->id,
+            'ip_address'     => request()->ip(),
+            'user_agent'     => request()->userAgent(),
+            'viewed_at'      => now(),
+        ]);
 
         $link->increment('view_count');
 

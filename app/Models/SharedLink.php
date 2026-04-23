@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class SharedLink extends Model
@@ -46,6 +47,11 @@ class SharedLink extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function views(): HasMany
+    {
+        return $this->hasMany(SharedLinkView::class)->latest('viewed_at');
     }
 
     /*

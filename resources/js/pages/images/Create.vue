@@ -1,64 +1,53 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { CloudUpload, File, Trash2, X } from 'lucide-vue-next';
-import { ref } from 'vue';
-
+import { CloudUpload, File, X, Zap } from 'lucide-vue-next';
+import { reactive, ref } from 'vue';
 import { Button } from '@/components/ui/button';
-
 import { Label } from '@/components/ui/label';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem } from '@/types';
 import { Switch } from '@/components/ui/switch';
+import AppLayout from '@/layouts/AppLayout.vue';
+import CompressionOptions from '@/components/Upload/CompressionOptions.vue';
+import { useCompression } from '@/composables/useCompression';
+import type { CompressionOptions as COpts } from '@/composables/useCompression';
+import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Images', href: '/images' },
-    { title: 'Upload', href: '/images/create' },
+    { title: 'Images',    href: '/images'    },
+    { title: 'Upload',    href: '/images/create' },
 ];
 
-const files = ref<File[]>([]);
-const previews = ref<string[]>([]);
+const { compressAll, compressing, formatSize } = useCompression();
+
+// ─── Files ────────────────────────────────────────────────────────────────────
+const files      = ref<File[]>([]);
+const previews   = ref<string[]>([]);
 const isDragging = ref(false);
-const isPrivate = ref(false);
-const stripExif = ref(true);
-const uploading = ref(false);
-const errors = ref<string[]>([]);
+const errors     = ref<string[]>([]);
 
 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/tiff'];
-const maxSize = 100 * 1024 * 1024; // 100MB
+const maxSize      = 100 * 1024 * 1024;
 
-function onDragOver(e: DragEvent) {
-    e.preventDefault();
-    isDragging.value = true;
-}
-
-function onDragLeave() {
-    isDragging.value = false;
-}
+function onDragOver(e: DragEvent) { e.preventDefault(); isDragging.value = true; }
+function onDragLeave()             { isDragging.value = false; }
 
 function onDrop(e: DragEvent) {
     e.preventDefault();
     isDragging.value = false;
-    if (e.dataTransfer?.files) {
-        addFiles(Array.from(e.dataTransfer.files));
-    }
+    if (e.dataTransfer?.files) addFiles(Array.from(e.dataTransfer.files));
 }
 
 function onFileInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    if (input.files) {
-        addFiles(Array.from(input.files));
-    }
+    if (input.files) addFiles(Array.from(input.files));
 }
 
 function onPaste(e: ClipboardEvent) {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    const imageFiles = Array.from(items)
+    const items = Array.from(e.clipboardData?.items ?? [])
         .filter(i => i.kind === 'file' && i.type.startsWith('image/'))
         .map(i => i.getAsFile())
         .filter(Boolean) as File[];
-    addFiles(imageFiles);
+    addFiles(items);
 }
 
 function addFiles(newFiles: File[]) {
@@ -88,20 +77,51 @@ function removeFile(index: number) {
     previews.value.splice(index, 1);
 }
 
-function upload() {
-    if (files.value.length === 0) return;
-    uploading.value = true;
-    errors.value = [];
+// ─── Settings ─────────────────────────────────────────────────────────────────
+const isPrivate = ref(false);
+const stripExif = ref(true);
 
+const compressionOpts = reactive<COpts>({
+    enabled:   true,
+    quality:   0.8,
+    maxWidth:  0,
+    maxHeight: 0,
+});
+
+// ─── Upload ───────────────────────────────────────────────────────────────────
+const uploading = ref(false);
+const savings   = ref<{ saved: number; total: number } | null>(null);
+
+async function upload() {
+    if (!files.value.length || uploading.value) return;
+    uploading.value = true;
+    errors.value    = [];
+    savings.value   = null;
+
+    // Compress
+    let totalOriginal   = 0;
+    let totalCompressed = 0;
+
+    const results = await compressAll(files.value, compressionOpts);
+    results.forEach(r => {
+        totalOriginal   += r.originalSize;
+        totalCompressed += r.compressedSize;
+    });
+
+    if (totalOriginal - totalCompressed > 0) {
+        savings.value = { saved: totalOriginal - totalCompressed, total: totalOriginal };
+    }
+
+    // Build form and post
     const formData = new FormData();
-    files.value.forEach(f => formData.append('images[]', f));
+    results.forEach((r, i) => formData.append(`images[${i}]`, r.file));
     formData.append('is_private', isPrivate.value ? '1' : '0');
-    formData.append('strip_exif', stripExif.value ? '1' : '0');
+    formData.append('strip_exif',  stripExif.value  ? '1' : '0');
 
     router.post('/images', formData, {
         forceFormData: true,
         onError: (e) => {
-            errors.value = Object.values(e).flat();
+            errors.value    = Object.values(e).flat() as string[];
             uploading.value = false;
         },
         onFinish: () => { uploading.value = false; },
@@ -121,13 +141,13 @@ function upload() {
 
             <!-- Dropzone -->
             <div
-                @dragover="onDragOver"
-                @dragleave="onDragLeave"
-                @drop="onDrop"
                 class="relative rounded-xl border-2 border-dashed transition-colors duration-200 p-10 text-center cursor-pointer mb-6"
                 :class="isDragging
                     ? 'border-[#7B2FFF] bg-[#7B2FFF]/5'
                     : 'border-border hover:border-[#7B2FFF]/50 hover:bg-muted/50'"
+                @dragover="onDragOver"
+                @dragleave="onDragLeave"
+                @drop="onDrop"
                 @click="($refs.fileInput as HTMLInputElement).click()"
             >
                 <input
@@ -185,33 +205,61 @@ function upload() {
                 </div>
             </div>
 
+            <!-- Compression savings banner -->
+            <div
+                v-if="savings"
+                class="mb-4 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-sm"
+            >
+                <Zap class="h-4 w-4 text-green-500 shrink-0" />
+                <span class="text-green-600 font-medium">
+                    Saved {{ formatSize(savings.saved) }}
+                    ({{ Math.round(savings.saved / savings.total * 100) }}%) via compression
+                </span>
+            </div>
+
             <!-- Options -->
-            <div class="rounded-xl border border-border p-4 space-y-4 mb-6">
-                <h3 class="text-sm font-semibold">Upload options</h3>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <Label class="font-medium">Strip EXIF data</Label>
-                        <p class="text-xs text-muted-foreground">Remove GPS, camera info from images</p>
+            <div class="space-y-4 mb-6">
+                <!-- Compression -->
+                <CompressionOptions
+                    :options="compressionOpts"
+                    @update:options="Object.assign(compressionOpts, $event)"
+                />
+
+                <!-- Upload options -->
+                <div class="rounded-xl border border-border p-4 space-y-4">
+                    <h3 class="text-sm font-semibold">Upload options</h3>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <Label class="font-medium">Strip EXIF data</Label>
+                            <p class="text-xs text-muted-foreground">Remove GPS, camera info from images</p>
+                        </div>
+                        <Switch v-model:checked="stripExif" />
                     </div>
-                    <Switch v-model:checked="stripExif" />
-                </div>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <Label class="font-medium">Private</Label>
-                        <p class="text-xs text-muted-foreground">Only you can see these images</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <Label class="font-medium">Private</Label>
+                            <p class="text-xs text-muted-foreground">Only you can see these images</p>
+                        </div>
+                        <Switch v-model:checked="isPrivate" />
                     </div>
-                    <Switch v-model:checked="isPrivate" />
                 </div>
             </div>
 
             <!-- Submit -->
             <Button
                 class="w-full gap-2 bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90"
-                :disabled="files.length === 0 || uploading"
+                :disabled="files.length === 0 || uploading || compressing"
                 @click="upload"
             >
-                <File class="h-4 w-4" />
-                {{ uploading ? 'Uploading...' : `Upload ${files.length > 0 ? files.length + ' image' + (files.length > 1 ? 's' : '') : ''}` }}
+                <Zap v-if="compressing" class="h-4 w-4 animate-pulse" />
+                <File v-else class="h-4 w-4" />
+                {{
+                    compressing ? 'Compressing...'
+                    : uploading  ? 'Uploading...'
+                    : files.length > 0
+                        ? `Upload ${files.length} image${files.length > 1 ? 's' : ''}`
+                        : 'Upload'
+                }}
             </Button>
         </div>
     </AppLayout>
