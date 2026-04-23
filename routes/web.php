@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GalleryController;
 use App\Http\Controllers\ImageController;
@@ -8,7 +9,6 @@ use App\Http\Controllers\PlanController;
 use App\Http\Controllers\SharedLinkController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
-use Illuminate\Support\Facades\Storage;
 
 // ============================================================
 // PUBLIC
@@ -49,7 +49,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/images/{image}',     [ImageController::class, 'show'])->name('images.show');
         Route::delete('/images/{image}',  [ImageController::class, 'destroy'])->name('images.destroy');
 
-        // ── Phase 3: watermark download ──────────────────────
         Route::get('/images/{image}/download', [ImageController::class, 'download'])->name('images.download');
 
         // Gallery
@@ -62,10 +61,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/shared-links/{sharedLink}',  [SharedLinkController::class, 'destroy'])->name('shared-links.destroy');
 
         // Invitations
-        Route::get('/invitations',                    [InvitationController::class, 'index'])->name('invitations.index');
-        Route::get('/invitations/create',             [InvitationController::class, 'create'])->name('invitations.create');
-        Route::post('/invitations',                   [InvitationController::class, 'store'])->name('invitations.store');
-        Route::delete('/invitations/{invitation}',    [InvitationController::class, 'destroy'])->name('invitations.destroy');
+        Route::get('/invitations',                   [InvitationController::class, 'index'])->name('invitations.index');
+        Route::get('/invitations/create',            [InvitationController::class, 'create'])->name('invitations.create');
+        Route::post('/invitations',                  [InvitationController::class, 'store'])->name('invitations.store');
+        Route::delete('/invitations/{invitation}',   [InvitationController::class, 'destroy'])->name('invitations.destroy');
 
         // Plans
         Route::get('/plans',             [PlanController::class, 'index'])->name('plans.index');
@@ -74,6 +73,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/plans/{plan}/edit', [PlanController::class, 'edit'])->name('plans.edit');
         Route::put('/plans/{plan}',      [PlanController::class, 'update'])->name('plans.update');
         Route::delete('/plans/{plan}',   [PlanController::class, 'destroy'])->name('plans.destroy');
+
+        // API Keys
+        Route::get('/settings/api-keys',           [ApiKeyController::class, 'index'])->name('api-keys.index');
+        Route::post('/settings/api-keys',          [ApiKeyController::class, 'store'])->name('api-keys.store');
+        Route::delete('/settings/api-keys/all',    [ApiKeyController::class, 'destroyAll'])->name('api-keys.destroyAll');
+        Route::delete('/settings/api-keys/{id}',   [ApiKeyController::class, 'destroy'])->name('api-keys.destroy');
     });
 
     // Image upload — auth + storage limit only
@@ -81,7 +86,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/images', [ImageController::class, 'store'])->name('images.store');
     });
 
-    // ── Phase 3: bulk ZIP download ────────────────────────────
     Route::post('/images/bulk-download', [ImageController::class, 'bulkDownload'])->name('images.bulk-download');
 });
 
@@ -90,8 +94,7 @@ require __DIR__.'/settings.php';
 require __DIR__.'/admin.php';
 
 // ============================================================
-// PUBLIC INVITATION ROUTES (last — wildcard after named paths)
+// PUBLIC INVITATION ROUTES
 // ============================================================
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
-
