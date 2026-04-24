@@ -8,14 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-// Removed: Laravel\Cashier\Billable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    // Removed: Billable
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     protected $fillable = [
         'name',
@@ -87,13 +85,9 @@ class User extends Authenticatable
     {
         $bytes = $this->storage_used ?? 0;
 
-        if ($bytes >= 1073741824) {
-            return number_format($bytes / 1073741824, 2) . ' GB';
-        } elseif ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 2) . ' MB';
-        } elseif ($bytes >= 1024) {
-            return number_format($bytes / 1024, 2) . ' KB';
-        }
+        if ($bytes >= 1073741824) return number_format($bytes / 1073741824, 2) . ' GB';
+        if ($bytes >= 1048576)    return number_format($bytes / 1048576, 2) . ' MB';
+        if ($bytes >= 1024)       return number_format($bytes / 1024, 2) . ' KB';
 
         return $bytes . ' B';
     }
@@ -102,13 +96,9 @@ class User extends Authenticatable
     {
         $limit = (int) ($this->plan?->storage_limit ?? config('iris.plans.free.storage_limit', 0));
 
-        if ($limit <= 0) {
-            return 0.00;
-        }
+        if ($limit <= 0) return 0.00;
 
-        $used = $this->storage_used ?? 0;
-
-        return round(($used / $limit) * 100, 2);
+        return round(($this->storage_used ?? 0) / $limit * 100, 2);
     }
 
     public function getAvatarUrlAttribute(): string
