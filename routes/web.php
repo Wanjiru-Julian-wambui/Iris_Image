@@ -79,7 +79,3 @@ require __DIR__.'/admin.php';
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
 
-Route::get('/run-migrate', function () {
-    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-    return \Illuminate\Support\Facades\Artisan::output();
-})->middleware('auth');
