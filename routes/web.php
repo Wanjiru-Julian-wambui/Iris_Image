@@ -78,3 +78,17 @@ require __DIR__.'/admin.php';
 
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
+
+Route::get('/debug-api-creds', function () {
+    try {
+        $user = \App\Models\User::find(6);
+        return [
+            'has_relation'   => method_exists($user, 'apiCredentials'),
+            'table_exists'   => \Illuminate\Support\Facades\Schema::hasTable('api_credentials'),
+            'controller_exists' => class_exists(\App\Http\Controllers\ApiCredentialController::class),
+            'model_exists'   => class_exists(\App\Models\ApiCredential::class),
+        ];
+    } catch (\Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+})->middleware('auth');
