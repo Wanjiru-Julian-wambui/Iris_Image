@@ -75,6 +75,11 @@ class User extends Authenticatable
         return $this->hasMany(Invitation::class, 'invited_by');
     }
 
+    public function apiCredentials(): HasMany
+    {
+        return $this->hasMany(ApiCredential::class);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Accessors

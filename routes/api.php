@@ -8,30 +8,32 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| Two authentication methods supported:
+|
+| 1. Bearer token (Sanctum):   Authorization: Bearer {token}
+|    - Obtained via POST /api/auth/login
+|
+| 2. API Key + Secret:         X-API-Key: ik_xxx  +  X-API-Secret: is_xxx
+|    - Generated in Settings > API Credentials
 |--------------------------------------------------------------------------
-|
-| All routes here are prefixed with /api and use the Sanctum guard.
-| Authenticate by sending:  Authorization: Bearer {token}
-|
 */
 
-// ── Public: auth ──────────────────────────────────────────────────────────
+// ── Public: auth ─────────────────────────────────────────────────────────
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login',    [AuthController::class, 'login']);
 });
 
-// ── Protected ─────────────────────────────────────────────────────────────
+// ── Sanctum-only routes ───────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
+    Route::post('auth/logout', [AuthController::class, 'logout']);
+    Route::get('auth/me',      [AuthController::class, 'me']);
+    Route::get('user',         [UserApiController::class, 'show']);
+    Route::patch('user',       [UserApiController::class, 'update']);
+});
 
-    // Auth
-    Route::post('auth/logout',  [AuthController::class, 'logout']);
-    Route::get('auth/me',       [AuthController::class, 'me']);
-
-    // User
-    Route::get('user',          [UserApiController::class, 'show']);
-    Route::patch('user',        [UserApiController::class, 'update']);
+// ── Bearer token OR API Key+Secret ───────────────────────────────────────
+Route::middleware('api.auth')->group(function () {
 
     // Images
     Route::get('images',             [ImageApiController::class, 'index']);
@@ -41,11 +43,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('images/{image}',  [ImageApiController::class, 'destroy']);
 
     // Shared links
-    Route::get('shared-links',                      [SharedLinkApiController::class, 'index']);
-    Route::post('shared-links',                     [SharedLinkApiController::class, 'store']);
-    Route::get('shared-links/{sharedLink}',         [SharedLinkApiController::class, 'show']);
-    Route::delete('shared-links/{sharedLink}',      [SharedLinkApiController::class, 'destroy']);
+    Route::get('shared-links',                 [SharedLinkApiController::class, 'index']);
+    Route::post('shared-links',                [SharedLinkApiController::class, 'store']);
+    Route::get('shared-links/{sharedLink}',    [SharedLinkApiController::class, 'show']);
+    Route::delete('shared-links/{sharedLink}', [SharedLinkApiController::class, 'destroy']);
 });
 
-// ── Public: resolve shared link by token ─────────────────────────────────
+// ── Public ───────────────────────────────────────────────────────────────
 Route::get('share/{token}', [SharedLinkApiController::class, 'resolve']);

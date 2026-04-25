@@ -5,6 +5,7 @@ import {
     CreditCard,
     Image as ImageIcon,
     Key,
+    KeyRound,
     LayoutGrid,
     Link as LinkIcon,
     Mail,
@@ -33,12 +34,13 @@ const user    = computed(() => (page.props.auth as any)?.user ?? null);
 const isAdmin = computed(() => user.value?.is_admin === true);
 
 const mainNavItems: NavItem[] = [
-    { title: 'Dashboard',    href: dashboard(),        icon: LayoutGrid  },
-    { title: 'Images',       href: '/images',          icon: Images      },
-    { title: 'Gallery',      href: '/gallery',         icon: ImageIcon   },
-    { title: 'Shared Links', href: '/shared-links',    icon: LinkIcon    },
-    { title: 'Plans',        href: '/plans',           icon: CreditCard  },
-    { title: 'API Keys',     href: '/settings/api-keys', icon: Key       },
+    { title: 'Dashboard',       href: dashboard(),                    icon: LayoutGrid  },
+    { title: 'Images',          href: '/images',                      icon: Images      },
+    { title: 'Gallery',         href: '/gallery',                     icon: ImageIcon   },
+    { title: 'Shared Links',    href: '/shared-links',                icon: LinkIcon    },
+    { title: 'Plans',           href: '/plans',                       icon: CreditCard  },
+    { title: 'API Keys',        href: '/settings/api-keys',           icon: Key         },
+    { title: 'API Credentials', href: '/settings/api-credentials',    icon: KeyRound    },
 ];
 
 const adminNavItems: NavItem[] = [

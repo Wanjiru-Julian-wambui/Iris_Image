@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AdminMiddleware;
+use App\Http\Middleware\AuthenticateApiCredential;
 use App\Http\Middleware\CheckStorageLimit;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -12,10 +13,10 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
+        web:      __DIR__.'/../routes/web.php',
+        api:      __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
-        health: '/up',
+        health:   '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'storage.limit' => CheckStorageLimit::class,
             'admin'         => AdminMiddleware::class,
             'plan.selected' => RequiresPlanSelection::class,
+            'api.auth'      => AuthenticateApiCredential::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

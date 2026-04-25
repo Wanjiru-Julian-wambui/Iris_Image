@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ApiCredentialController;
 use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GalleryController;
@@ -10,10 +11,6 @@ use App\Http\Controllers\SharedLinkController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
-// ============================================================
-// PUBLIC
-// ============================================================
-
 Route::inertia('/', 'Welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
@@ -21,52 +18,35 @@ Route::inertia('/', 'Welcome', [
 Route::get('/share/{token}',  [SharedLinkController::class, 'show'])->name('shared-links.show');
 Route::post('/share/{token}', [SharedLinkController::class, 'verify'])->name('shared-links.verify');
 
-
-// ============================================================
-// AUTHENTICATED
-// ============================================================
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // ----------------------------------------------------------
-    // Plan chooser + PayPal endpoints
-    // ----------------------------------------------------------
     Route::get('/plans/choose',           [PlanController::class, 'choose'])->name('plans.choose');
     Route::post('/plans/select',          [PlanController::class, 'select'])->name('plans.select');
     Route::post('/plans/{plan}/checkout', [PlanController::class, 'checkout'])->name('plans.checkout');
     Route::post('/plans/{plan}/capture',  [PlanController::class, 'capture'])->name('plans.capture');
 
-    // ----------------------------------------------------------
-    // Protected app routes — require a plan to be chosen first.
-    // ----------------------------------------------------------
     Route::middleware('plan.selected')->group(function () {
 
-        // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Images
-        Route::get('/images',             [ImageController::class, 'index'])->name('images.index');
-        Route::get('/images/create',      [ImageController::class, 'create'])->name('images.create');
-        Route::get('/images/{image}',     [ImageController::class, 'show'])->name('images.show');
-        Route::delete('/images/{image}',  [ImageController::class, 'destroy'])->name('images.destroy');
-
+        Route::get('/images',                  [ImageController::class, 'index'])->name('images.index');
+        Route::get('/images/create',           [ImageController::class, 'create'])->name('images.create');
+        Route::get('/images/{image}',          [ImageController::class, 'show'])->name('images.show');
+        Route::delete('/images/{image}',       [ImageController::class, 'destroy'])->name('images.destroy');
         Route::get('/images/{image}/download', [ImageController::class, 'download'])->name('images.download');
 
-        // Gallery
         Route::get('/gallery', [GalleryController::class, 'index'])->name('gallery');
 
-        // Shared links
         Route::get('/shared-links',                  [SharedLinkController::class, 'index'])->name('shared-links.index');
         Route::get('/shared-links/create',           [SharedLinkController::class, 'create'])->name('shared-links.create');
         Route::post('/shared-links',                 [SharedLinkController::class, 'store'])->name('shared-links.store');
         Route::delete('/shared-links/{sharedLink}',  [SharedLinkController::class, 'destroy'])->name('shared-links.destroy');
 
-        // Invitations
         Route::get('/invitations',                   [InvitationController::class, 'index'])->name('invitations.index');
         Route::get('/invitations/create',            [InvitationController::class, 'create'])->name('invitations.create');
         Route::post('/invitations',                  [InvitationController::class, 'store'])->name('invitations.store');
         Route::delete('/invitations/{invitation}',   [InvitationController::class, 'destroy'])->name('invitations.destroy');
 
-        // Plans
         Route::get('/plans',             [PlanController::class, 'index'])->name('plans.index');
         Route::get('/plans/create',      [PlanController::class, 'create'])->name('plans.create');
         Route::post('/plans',            [PlanController::class, 'store'])->name('plans.store');
@@ -74,14 +54,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/plans/{plan}',      [PlanController::class, 'update'])->name('plans.update');
         Route::delete('/plans/{plan}',   [PlanController::class, 'destroy'])->name('plans.destroy');
 
-        // API Keys
-        Route::get('/settings/api-keys',           [ApiKeyController::class, 'index'])->name('api-keys.index');
-        Route::post('/settings/api-keys',          [ApiKeyController::class, 'store'])->name('api-keys.store');
-        Route::delete('/settings/api-keys/all',    [ApiKeyController::class, 'destroyAll'])->name('api-keys.destroyAll');
-        Route::delete('/settings/api-keys/{id}',   [ApiKeyController::class, 'destroy'])->name('api-keys.destroy');
+        // Sanctum Bearer token keys
+        Route::get('/settings/api-keys',          [ApiKeyController::class, 'index'])->name('api-keys.index');
+        Route::post('/settings/api-keys',         [ApiKeyController::class, 'store'])->name('api-keys.store');
+        Route::delete('/settings/api-keys/all',   [ApiKeyController::class, 'destroyAll'])->name('api-keys.destroyAll');
+        Route::delete('/settings/api-keys/{id}',  [ApiKeyController::class, 'destroy'])->name('api-keys.destroy');
+
+        // API Key + Secret credentials
+        Route::get('/settings/api-credentials',          [ApiCredentialController::class, 'index'])->name('api-credentials.index');
+        Route::post('/settings/api-credentials',         [ApiCredentialController::class, 'store'])->name('api-credentials.store');
+        Route::delete('/settings/api-credentials/{id}',  [ApiCredentialController::class, 'destroy'])->name('api-credentials.destroy');
     });
 
-    // Image upload — auth + storage limit only
     Route::middleware('storage.limit')->group(function () {
         Route::post('/images', [ImageController::class, 'store'])->name('images.store');
     });
@@ -89,12 +73,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/images/bulk-download', [ImageController::class, 'bulkDownload'])->name('images.bulk-download');
 });
 
-// Settings & Admin
 require __DIR__.'/settings.php';
 require __DIR__.'/admin.php';
 
-// ============================================================
-// PUBLIC INVITATION ROUTES
-// ============================================================
 Route::get('/invitations/{token}',         [InvitationController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])->name('invitations.accept');
