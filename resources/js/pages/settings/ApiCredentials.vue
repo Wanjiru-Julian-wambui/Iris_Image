@@ -216,7 +216,7 @@ IRIS_API_URL={{ appUrl }}</pre>
   -H "X-API-Key: ik_your_key_here" \
   -H "X-API-Secret: is_your_secret_here"</pre>
                             <button
-                                @click="copy(`curl ${appUrl}/api/images \\\n  -H \"X-API-Key: ik_your_key_here\" \\\n  -H \"X-API-Secret: is_your_secret_here\"`, 'curl')"
+                                @click="copy('curl ' + appUrl + '/api/images \\\n  -H \"X-API-Key: ik_your_key_here\" \\\n  -H \"X-API-Secret: is_your_secret_here\"', 'curl')"
                                 class="absolute top-3 right-3 rounded-lg px-2.5 py-1 text-xs font-semibold bg-background border border-border text-muted-foreground hover:text-foreground transition-colors"
                             >{{ copiedId === 'curl' ? '✓' : 'Copy' }}</button>
                         </div>
