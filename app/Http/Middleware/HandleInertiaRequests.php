@@ -43,5 +43,12 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
+
+        return array_merge(parent::share($request), [
+        'flash' => [
+            'new_key' => $request->session()->get('new_key'),
+            'new_secret' => $request->session()->get('new_secret'),
+        ],
+    ]);
     }
 }
