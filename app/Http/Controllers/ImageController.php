@@ -18,7 +18,8 @@ class ImageController extends Controller
     {
         $images = $request->user()
             ->images()
-            ->latest()
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('created_at', 'desc')
             ->paginate(24);
 
         return Inertia::render('images/Index', [
@@ -51,7 +52,7 @@ class ImageController extends Controller
     {
         abort_unless($image->user_id === auth()->id(), 403);
 
-        $image->load(['user', 'sharedLinks']);
+        $image->load(['user', 'sharedLinks', 'notes.user']);
 
         return Inertia::render('images/Show', [
             'image' => new ImageResource($image),
@@ -85,5 +86,58 @@ class ImageController extends Controller
         return redirect()->route('images.index')->with('success',
             'Image deleted successfully.'
         );
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        
+        $images = $request->user()
+            ->images()
+            ->whereIn('id', $ids)
+            ->get();
+
+        foreach ($images as $image) {
+            $this->imageService->delete($image);
+        }
+
+        return back()->with('success', $images->count() . ' image(s) deleted.');
+    }
+
+    public function reorder(Request $request)
+    {
+        $ordered = $request->input('ordered_ids', []);
+
+        foreach ($ordered as $index => $id) {
+            $request->user()
+                ->images()
+                ->where('id', $id)
+                ->update(['sort_order' => $index]);
+        }
+
+        return back()->with('success', 'Images reordered.');
+    }
+
+    public function update(Request $request, Image $image)
+    {
+        abort_unless($image->user_id === auth()->id(), 403);
+
+        $data = $request->validate([
+            'caption'  => ['nullable', 'string', 'max:2000'],
+            'alt_text' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $image->update($data);
+
+        return back()->with('success', 'Image updated.');
+    }
+
+    public function download(Image $image)
+    {
+        abort_unless($image->user_id === auth()->id(), 403);
+
+        $image->incrementDownload();
+
+        return redirect($image->url);
     }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { CloudUpload, File, X, Zap } from 'lucide-vue-next';
-import { reactive, ref } from 'vue';
+import { reactive, ref, onMounted, onUnmounted } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -18,6 +18,22 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const { compressAll, compressing, formatSize } = useCompression();
+
+// ─── Dark mode force ──────────────────────────────────────────────────────────
+const originalTheme = ref<string | null>(null);
+
+onMounted(() => {
+    originalTheme.value = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+});
+
+onUnmounted(() => {
+    if (originalTheme.value === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+    }
+});
 
 // ─── Files ────────────────────────────────────────────────────────────────────
 const files      = ref<File[]>([]);
@@ -98,7 +114,6 @@ async function upload() {
     errors.value    = [];
     savings.value   = null;
 
-    // Compress
     let totalOriginal   = 0;
     let totalCompressed = 0;
 
@@ -112,7 +127,6 @@ async function upload() {
         savings.value = { saved: totalOriginal - totalCompressed, total: totalOriginal };
     }
 
-    // Build form and post
     const formData = new FormData();
     results.forEach((r, i) => formData.append(`images[${i}]`, r.file));
     formData.append('is_private', isPrivate.value ? '1' : '0');
@@ -143,8 +157,8 @@ async function upload() {
             <div
                 class="relative rounded-xl border-2 border-dashed transition-colors duration-200 p-10 text-center cursor-pointer mb-6"
                 :class="isDragging
-                    ? 'border-[#7B2FFF] bg-[#7B2FFF]/5'
-                    : 'border-border hover:border-[#7B2FFF]/50 hover:bg-muted/50'"
+                    ? 'border-violet-500 bg-violet-500/5'
+                    : 'border-border hover:border-violet-500/50 hover:bg-muted/50'"
                 @dragover="onDragOver"
                 @dragleave="onDragLeave"
                 @drop="onDrop"
@@ -164,7 +178,7 @@ async function upload() {
                     </div>
                     <div>
                         <p class="font-medium text-sm">
-                            Drop images here or <span class="text-[#7B2FFF]">browse</span>
+                            Drop images here or <span class="text-violet-400">browse</span>
                         </p>
                         <p class="text-xs text-muted-foreground mt-1">
                             JPG, PNG, GIF, WEBP, SVG, TIFF · Max 100MB · Up to 20 files
@@ -208,10 +222,10 @@ async function upload() {
             <!-- Compression savings banner -->
             <div
                 v-if="savings"
-                class="mb-4 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-sm"
+                class="mb-4 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm"
             >
-                <Zap class="h-4 w-4 text-green-500 shrink-0" />
-                <span class="text-green-600 font-medium">
+                <Zap class="h-4 w-4 text-emerald-400 shrink-0" />
+                <span class="text-emerald-400 font-medium">
                     Saved {{ formatSize(savings.saved) }}
                     ({{ Math.round(savings.saved / savings.total * 100) }}%) via compression
                 </span>
@@ -219,13 +233,11 @@ async function upload() {
 
             <!-- Options -->
             <div class="space-y-4 mb-6">
-                <!-- Compression -->
                 <CompressionOptions
                     :options="compressionOpts"
                     @update:options="Object.assign(compressionOpts, $event)"
                 />
 
-                <!-- Upload options -->
                 <div class="rounded-xl border border-border p-4 space-y-4">
                     <h3 class="text-sm font-semibold">Upload options</h3>
                     <div class="flex items-center justify-between">
@@ -247,7 +259,7 @@ async function upload() {
 
             <!-- Submit -->
             <Button
-                class="w-full gap-2 bg-gradient-to-r from-[#7B2FFF] to-[#00E5FF] text-white hover:opacity-90"
+                class="w-full gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
                 :disabled="files.length === 0 || uploading || compressing"
                 @click="upload"
             >

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { ref, computed } from 'vue';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard',  href: '/dashboard' },
+    { title: 'Dashboard', href: '/dashboard' },
     { title: 'API Keys',   href: '/settings/api-keys' },
 ];
 
@@ -18,10 +18,15 @@ const props = defineProps<{
         created_at: string;
         expires_at: string | null;
     }[];
+    appUrl: string;
+    flash: {
+        new_token?: string;
+        success?: string;
+    };
 }>();
 
-const page     = usePage();
-const newToken = computed(() => (page.props.flash as any)?.new_token ?? null);
+// ── Flash token (only available immediately after creation) ──
+const newToken = computed(() => props.flash?.new_token ?? null);
 const copied   = ref(false);
 
 function copyToken() {
@@ -94,7 +99,7 @@ const abilityMeta: Record<string, { label: string; color: string }> = {
                     </p>
                 </div>
                 <button
-                    v-if="!showCreate"
+                    v-if="!showCreate && !newToken"
                     @click="showCreate = true"
                     class="shrink-0 rounded-xl bg-gradient-to-r from-violet-500 to-cyan-400 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
                 >
@@ -112,7 +117,7 @@ const abilityMeta: Record<string, { label: string; color: string }> = {
                     <p class="text-sm font-semibold text-emerald-400">Token created — copy it now, it won't be shown again.</p>
                 </div>
                 <div class="flex items-center gap-3 rounded-xl bg-background/60 border border-border px-4 py-3">
-                    <code class="flex-1 truncate text-xs font-mono text-foreground select-all">{{ newToken }}</code>
+                    <code class="flex-1 text-xs font-mono text-foreground break-all select-all">{{ newToken }}</code>
                     <button
                         @click="copyToken"
                         class="shrink-0 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/30 transition-colors"
@@ -262,19 +267,19 @@ const abilityMeta: Record<string, { label: string; color: string }> = {
                 <h3 class="text-sm font-semibold text-foreground mb-3">Quick reference</h3>
                 <div class="space-y-2 text-xs font-mono text-muted-foreground">
                     <div class="rounded-lg bg-muted/60 px-4 py-2.5">
-                        <span class="text-violet-400">GET</span>  /api/images
+                        <span class="text-violet-400">GET</span>  {{ appUrl }}/api/images
                     </div>
                     <div class="rounded-lg bg-muted/60 px-4 py-2.5">
-                        <span class="text-emerald-400">POST</span> /api/images
+                        <span class="text-emerald-400">POST</span> {{ appUrl }}/api/images
                     </div>
                     <div class="rounded-lg bg-muted/60 px-4 py-2.5">
-                        <span class="text-rose-400">DELETE</span> /api/images/{id}
+                        <span class="text-rose-400">DELETE</span> {{ appUrl }}/api/images/{id}
                     </div>
                     <div class="rounded-lg bg-muted/60 px-4 py-2.5">
-                        <span class="text-violet-400">GET</span>  /api/shared-links
+                        <span class="text-violet-400">GET</span>  {{ appUrl }}/api/shared-links
                     </div>
                     <div class="rounded-lg bg-muted/60 px-4 py-2.5">
-                        <span class="text-emerald-400">POST</span> /api/auth/login  <span class="text-muted-foreground/50"># returns token</span>
+                        <span class="text-emerald-400">POST</span> {{ appUrl }}/api/auth/login  <span class="text-muted-foreground/50"># returns token</span>
                     </div>
                 </div>
                 <p class="mt-3 text-xs text-muted-foreground">

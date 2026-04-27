@@ -22,17 +22,11 @@ export function useExif() {
     const loading = ref(false);
     const error   = ref<string | null>(null);
 
-    /**
-     * Read EXIF data from a File object in the browser.
-     * Requires the `exifr` library — install with:
-     *   npm install exifr
-     */
     async function readFromFile(file: File): Promise<ExifData | null> {
         loading.value = true;
         error.value   = null;
 
         try {
-            // Dynamic import so exifr is only loaded when needed
             const exifr = await import('exifr').catch(() => null);
 
             if (!exifr) {
@@ -81,17 +75,10 @@ export function useExif() {
         }
     }
 
-    /**
-     * Check if a file likely contains EXIF data.
-     * Only JPEG and TIFF files carry EXIF.
-     */
     function fileHasExif(file: File): boolean {
         return ['image/jpeg', 'image/jpg', 'image/tiff'].includes(file.type);
     }
 
-    /**
-     * Format a GPS coordinate for display.
-     */
     function formatGps(gps: { lat: number; lng: number }): string {
         const latDir = gps.lat >= 0 ? 'N' : 'S';
         const lngDir = gps.lng >= 0 ? 'E' : 'W';

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
 import {
     CreditCard,
     Image as ImageIcon,
@@ -11,7 +10,9 @@ import {
     Mail,
     Shield,
     Images,
+    FolderOpen,
 } from 'lucide-vue-next';
+import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -37,6 +38,7 @@ const mainNavItems: NavItem[] = [
     { title: 'Dashboard',       href: dashboard(),                    icon: LayoutGrid  },
     { title: 'Images',          href: '/images',                      icon: Images      },
     { title: 'Gallery',         href: '/gallery',                     icon: ImageIcon   },
+    { title: 'Albums',          href: '/albums',                      icon: FolderOpen  },
     { title: 'Shared Links',    href: '/shared-links',                icon: LinkIcon    },
     { title: 'Plans',           href: '/plans',                       icon: CreditCard  },
     { title: 'API Keys',        href: '/settings/api-keys',           icon: Key         },

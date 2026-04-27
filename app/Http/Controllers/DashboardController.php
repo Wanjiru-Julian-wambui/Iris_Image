@@ -18,9 +18,43 @@ class DashboardController extends Controller
             ->take(8)
             ->get();
 
+        $storageTrend = $request->user()
+            ->images()
+            ->selectRaw('DATE(created_at) as date, SUM(size) as total_size')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->map(fn($row) => [
+                'date' => $row->date,
+                'size' => (int) $row->total_size,
+            ]);
+
+        $uploadsPerDay = $request->user()
+            ->images()
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->map(fn($row) => [
+                'date'  => $row->date,
+                'count' => (int) $row->count,
+            ]);
+
+        $linkViews = \DB::table('shared_links')
+            ->selectRaw('DATE(created_at) as date, SUM(view_count) as views')
+            ->where('user_id', $request->user()->id)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get()
+            ->map(fn($row) => [
+                'date'  => $row->date,
+                'views' => (int) $row->views,
+            ]);
+
         return Inertia::render('Dashboard', [
-            // Pass user fields directly — avoids the { data: {...} } wrapper
-            // that JsonResource adds, which breaks Vue prop destructuring.
             'user' => [
                 'id'                 => $user->id,
                 'name'               => $user->name,
@@ -37,8 +71,15 @@ class DashboardController extends Controller
             'recentImages' => ImageResource::collection($images),
 
             'stats' => [
-                'total_images' => $user->images()->count(),
-                'shared_links' => $user->sharedLinks()->active()->count(),
+                'total_images'    => $user->images()->count(),
+                'shared_links'    => $user->sharedLinks()->active()->count(),
+                'download_count'  => $user->images()->sum('download_count'),
+            ],
+
+            'charts' => [
+                'storageTrend'  => $storageTrend,
+                'uploadsPerDay' => $uploadsPerDay,
+                'linkViews'     => $linkViews,
             ],
         ]);
     }

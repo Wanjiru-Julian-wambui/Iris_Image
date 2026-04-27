@@ -19,26 +19,31 @@ class ApiKeyController extends Controller
                 'name'         => $token->name,
                 'abilities'    => $token->abilities,
                 'last_used_at' => $token->last_used_at?->diffForHumans(),
-                'created_at'   => $token->created_at->toDateTimeString(),
-                'expires_at'   => $token->expires_at?->toDateTimeString(),
+                'created_at'   => $token->created_at->diffForHumans(),
+                'expires_at'   => $token->expires_at?->diffForHumans(),
             ]);
 
         return Inertia::render('settings/ApiKeys', [
-            'tokens' => $tokens,
+            'tokens'  => $tokens,
+            'appUrl'  => config('app.url'),
+            'flash'   => [
+                'new_token' => session('new_token'),
+                'success'   => session('success'),
+            ],
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'       => ['required', 'string', 'max:100'],
-            'abilities'  => ['array'],
-            'abilities.*'=> ['string', 'in:read,write,delete'],
-            'expires_in' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'name'        => ['required', 'string', 'max:100'],
+            'abilities'   => ['array'],
+            'abilities.*' => ['string', 'in:read,write,delete'],
+            'expires_in'  => ['nullable', 'integer', 'min:1', 'max:365'],
         ]);
 
-        $abilities  = $data['abilities'] ?? ['read'];
-        $expiresAt  = isset($data['expires_in'])
+        $abilities = $data['abilities'] ?? ['read'];
+        $expiresAt = isset($data['expires_in'])
             ? now()->addDays($data['expires_in'])
             : null;
 
