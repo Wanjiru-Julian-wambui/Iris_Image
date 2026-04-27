@@ -44,7 +44,7 @@ class DashboardController extends Controller
 
         $linkViews = \DB::table('shared_links')
             ->selectRaw('DATE(created_at) as date, SUM(view_count) as views')
-            ->where('user_id', $request->user()->id)
+            ->where('created_by', $request->user()->id)
             ->where('created_at', '>=', now()->subDays(30))
             ->groupBy('date')
             ->orderBy('date')
