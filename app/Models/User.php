@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Album;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -63,6 +64,11 @@ class User extends Authenticatable
     public function images(): HasMany
     {
         return $this->hasMany(Image::class);
+    }
+
+    public function albums(): HasMany
+    {
+        return $this->hasMany(Album::class);
     }
 
     public function sharedLinks(): HasMany
