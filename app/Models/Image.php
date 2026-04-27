@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Image extends Model
@@ -33,6 +34,7 @@ class Image extends Model
         'download_count',
         'caption',
         'alt_text',
+        'hash',
     ];
 
     protected $casts = [
@@ -56,6 +58,8 @@ class Image extends Model
         });
     }
 
+    // ─── Relationships ────────────────────────────────────────────────────────
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -76,6 +80,44 @@ class Image extends Model
         return $this->belongsToMany(Album::class, 'album_image')
             ->withPivot('sort_order');
     }
+
+    // ─── URL Accessors ────────────────────────────────────────────────────────
+
+    /**
+     * Return the stored URL, or compute it from path as a fallback.
+     * This ensures existing records with null url still resolve correctly.
+     */
+    public function getUrlAttribute(): string
+    {
+        if (!empty($this->attributes['url'])) {
+            return $this->attributes['url'];
+        }
+
+        if (!empty($this->path)) {
+            return Storage::disk(config('filesystems.default'))->url($this->path);
+        }
+
+        return '';
+    }
+
+    /**
+     * Return the stored thumbnail URL, or fall back to the full image URL.
+     */
+    public function getThumbnailUrlAttribute(): string
+    {
+        if (!empty($this->attributes['thumbnail_url'])) {
+            return $this->attributes['thumbnail_url'];
+        }
+
+        // Fall back to thumbnail_path if available, otherwise the main image
+        if (!empty($this->thumbnail_path)) {
+            return Storage::disk(config('filesystems.default'))->url($this->thumbnail_path);
+        }
+
+        return $this->url;
+    }
+
+    // ─── Other Accessors ─────────────────────────────────────────────────────
 
     public function getPublicUrlAttribute(): string
     {

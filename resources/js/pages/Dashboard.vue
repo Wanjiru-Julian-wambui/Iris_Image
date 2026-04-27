@@ -40,18 +40,25 @@ function formatBytes(bytes: number): string {
 const storageUsed  = computed(() => props.user.storage_used_human ?? '0 B');
 const storageLimit = computed(() => formatBytes(props.user.storage_limit ?? 0));
 
-// Use a minimum visible percent so the ring always shows something when storage > 0
-const displayPercent = computed(() => {
+// Actual decimal percentage, e.g. 0.44
+const actualPercent = computed(() => {
     const raw = props.user.storage_percent ?? 0;
-    if (raw > 0 && raw < 1) return 1; // show at least 1% arc
-    return Math.round(raw);
+    return Math.round(raw * 100) / 100; // 2 decimal places
+});
+
+// For the arc: use actual raw value but ensure minimum visible arc when > 0
+const arcPercent = computed(() => {
+    const raw = props.user.storage_percent ?? 0;
+    if (raw > 0 && raw < 0.5) return 0.5;
+    return raw;
 });
 
 const animatedImages    = ref(0);
 const animatedLinks     = ref(0);
 const animatedDownloads = ref(0);
-const animatedPercent   = ref(0);
+const animatedArcPct    = ref(0);
 const mounted           = ref(false);
+const waving            = ref(false);
 
 function animateCounter(target: number, setter: (v: number) => void, duration = 1200) {
     const start = performance.now();
@@ -64,25 +71,40 @@ function animateCounter(target: number, setter: (v: number) => void, duration = 
     requestAnimationFrame(step);
 }
 
+function animateFloat(target: number, setter: (v: number) => void, duration = 1400) {
+    const start = performance.now();
+    const step  = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        const ease     = 1 - Math.pow(1 - progress, 3);
+        setter(Math.round(target * ease * 100) / 100);
+        if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
+
 onMounted(() => {
     setTimeout(() => {
         mounted.value = true;
-        animateCounter(props.stats.total_images,        v => animatedImages.value    = v);
-        animateCounter(props.stats.shared_links,        v => animatedLinks.value     = v);
-        animateCounter(props.stats.download_count,      v => animatedDownloads.value = v);
-        animateCounter(displayPercent.value,            v => animatedPercent.value   = v, 1400);
+        waving.value  = true;
+        // Stop waving class after 3 cycles (~2.2s * 3 = 6.6s)
+        setTimeout(() => { waving.value = false; }, 7000);
+
+        animateCounter(props.stats.total_images,   v => animatedImages.value    = v);
+        animateCounter(props.stats.shared_links,   v => animatedLinks.value     = v);
+        animateCounter(props.stats.download_count, v => animatedDownloads.value = v);
+        animateFloat(arcPercent.value,             v => animatedArcPct.value    = v);
     }, 100);
 });
 
 const uid    = Math.random().toString(36).slice(2, 8);
 const gradId = `sg-${uid}`;
-const SIZE   = 130;
-const STROKE = 12;
+const SIZE   = 140;
+const STROKE = 22;  // thick like the donut in image 2
 const R      = (SIZE - STROKE) / 2;
 const CIRCUM = 2 * Math.PI * R;
 
 const usedDash = computed(() => {
-    const pct = Math.min(animatedPercent.value, 100) / 100;
+    const pct = Math.min(animatedArcPct.value, 100) / 100;
     return `${(pct * CIRCUM).toFixed(2)} ${CIRCUM.toFixed(2)}`;
 });
 
@@ -156,7 +178,13 @@ const viewsChartData = computed(() => {
                 <p class="text-base font-medium text-white/70 mb-1">Welcome back</p>
                 <h1 class="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
                     {{ props.user?.name ?? 'there' }}
-                    <span class="wave-emoji" aria-label="waving hand">👋</span>
+                    <span
+                        class="wave-emoji"
+                        :class="{ 'is-waving': waving }"
+                        aria-hidden="true"
+                        @mouseenter="waving = true"
+                        @mouseleave="waving = false"
+                    >👋</span>
                 </h1>
                 <p class="mt-2 text-sm text-white/60">Here's what's happening with your files today.</p>
             </div>
@@ -171,25 +199,29 @@ const viewsChartData = computed(() => {
                     <span class="text-4xl font-bold tabular-nums text-foreground">{{ animatedImages }}</span>
                 </div>
 
-                <!-- Storage Ring -->
-                <div class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-4"
+                <!-- Storage Donut -->
+                <div class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-3"
                      :class="mounted ? 'card-in' : 'opacity-0'" style="animation-delay: 0.12s">
                     <span class="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Storage</span>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-5">
+                        <!-- Donut SVG -->
                         <div class="relative shrink-0" :style="`width:${SIZE}px;height:${SIZE}px`">
-                            <svg :width="SIZE" :height="SIZE" :viewBox="`0 0 ${SIZE} ${SIZE}`"
-                                 style="transform: rotate(-90deg); overflow: visible;">
+                            <svg
+                                :width="SIZE" :height="SIZE"
+                                :viewBox="`0 0 ${SIZE} ${SIZE}`"
+                                style="transform: rotate(-90deg);"
+                            >
                                 <defs>
                                     <linearGradient :id="gradId" x1="0%" y1="0%" x2="100%" y2="0%">
                                         <stop offset="0%" stop-color="#7B2FFF" />
                                         <stop offset="100%" stop-color="#00C6FF" />
                                     </linearGradient>
                                 </defs>
-                                <!-- Track -->
+                                <!-- Track ring -->
                                 <circle
                                     :cx="SIZE / 2" :cy="SIZE / 2" :r="R"
                                     fill="none"
-                                    stroke="#e5e7eb"
+                                    stroke="#e2e8f0"
                                     :stroke-width="STROKE"
                                 />
                                 <!-- Progress arc -->
@@ -205,13 +237,14 @@ const viewsChartData = computed(() => {
                             </svg>
                             <!-- Centre label -->
                             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span class="text-lg font-bold text-foreground leading-none">
-                                    {{ displayPercent < 1 ? '<1' : animatedPercent }}%
+                                <span class="text-base font-bold text-foreground leading-none">
+                                    {{ actualPercent }}%
                                 </span>
                             </div>
                         </div>
-                        <div>
-                            <p class="text-base font-bold text-foreground">{{ storageUsed }}</p>
+                        <!-- Text info -->
+                        <div class="flex flex-col gap-1">
+                            <p class="text-lg font-bold text-foreground leading-tight">{{ storageUsed }}</p>
                             <p class="text-sm text-muted-foreground">of {{ storageLimit }}</p>
                         </div>
                     </div>
@@ -285,43 +318,19 @@ const viewsChartData = computed(() => {
     </AppLayout>
 </template>
 
-<style scoped>
-/* Banner */
-.banner-in { animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-16px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-/* Cards */
-.card-in { animation: fadeUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-@keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-/* Tiles */
-.tile-in { animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-@keyframes popIn {
-    from { opacity: 0; transform: scale(0.88); }
-    to   { opacity: 1; transform: scale(1); }
-}
-
-/* Stat card hover */
-.stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-.stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px -8px rgba(123, 47, 255, 0.18); }
-
-/* Waving hand */
+<style>
+/* Global so the emoji span isn't blocked by Vue scoped hashing */
 .wave-emoji {
     display: inline-block;
     transform-origin: 70% 70%;
-    animation: wave 2.2s ease-in-out 0.8s 3;
-}
-.wave-emoji:hover {
-    animation: wave 0.6s ease-in-out infinite;
     cursor: default;
+    font-size: 1.8rem;
+    line-height: 1;
 }
-@keyframes wave {
+.wave-emoji.is-waving {
+    animation: wave-hand 2.2s ease-in-out 3;
+}
+@keyframes wave-hand {
     0%   { transform: rotate(  0deg); }
     10%  { transform: rotate( 14deg); }
     20%  { transform: rotate( -8deg); }
@@ -331,4 +340,24 @@ const viewsChartData = computed(() => {
     60%  { transform: rotate(  0deg); }
     100% { transform: rotate(  0deg); }
 }
+</style>
+
+<style scoped>
+.banner-in { animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.card-in { animation: fadeUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.tile-in { animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes popIn {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px -8px rgba(123, 47, 255, 0.18); }
 </style>

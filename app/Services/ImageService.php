@@ -86,17 +86,23 @@ class ImageService
             // Upload to configured disk (s3 on production, public locally)
             $path = $this->storageService->store($file, $user);
 
-            // Verify upload using Storage facade (works with S3)
             $disk = config('filesystems.default');
+
+            // Verify upload using Storage facade (works with S3)
             if (!Storage::disk($disk)->exists($path)) {
                 throw new \Exception("File missing after upload: {$path}");
             }
+
+            // Generate the public URL from the stored path
+            $url = Storage::disk($disk)->url($path);
 
             $image = Image::create([
                 'user_id'       => $user->id,
                 'name'          => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
                 'original_name' => $file->getClientOriginalName(),
                 'path'          => $path,
+                'url'           => $url,
+                'thumbnail_url' => $url, // same as url until thumbnail generation is added
                 'mime_type'     => $file->getMimeType(),
                 'extension'     => strtolower($file->getClientOriginalExtension()),
                 'size'          => $file->getSize(),
