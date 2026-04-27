@@ -31,8 +31,8 @@ class ApiCredential extends Model
      */
     public static function generate(int $userId, string $label = 'Default'): array
     {
-        $plainKey    = 'ik_' . Str::random(32);   // iris key
-        $plainSecret = 'is_' . Str::random(48);   // iris secret
+        $plainKey    = 'ik_' . Str::random(32);
+        $plainSecret = 'is_' . Str::random(48);
 
         static::create([
             'user_id'    => $userId,

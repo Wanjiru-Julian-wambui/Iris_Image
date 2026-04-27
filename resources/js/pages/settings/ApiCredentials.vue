@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
@@ -14,7 +14,7 @@ const props = defineProps<{
         id: number;
         label: string;
         api_key: string;
-        api_secret: string;     // hashed — only used to detect "has secret"
+        api_secret: string;
         last_used_at: string | null;
         created_at: string;
     }[];
@@ -24,8 +24,6 @@ const props = defineProps<{
         new_secret?: string;
     };
 }>();
-
-const page = usePage();
 
 // ── Flash credentials (only available immediately after generation) ──
 const newKey    = computed(() => props.flash?.new_key    ?? null);
@@ -46,7 +44,7 @@ function toggle(id: number, field: 'key' | 'secret') {
 }
 
 function masked(str: string): string {
-    return str.slice(0, 8) + '•'.repeat(Math.max(str.length - 8, 16));
+    return str.slice(0, 8) + '••••••••••••••••••••';
 }
 
 // ── Copy helper ───────────────────────────────────────────────────
@@ -145,7 +143,7 @@ function remove(id: number) {
                 <div class="space-y-1.5">
                     <label class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">API Key</label>
                     <div class="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3">
-                        <code class="flex-1 text-sm font-mono text-foreground select-all break-all">{{ newKey }}</code>
+                        <code class="flex-1 text-sm font-mono text-foreground break-all">{{ newKey }}</code>
                         <button
                             @click="copy(newKey, 'key')"
                             class="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
@@ -164,7 +162,7 @@ function remove(id: number) {
                         >{{ showNewSecret ? '🙈 Hide' : '👁 Reveal' }}</button>
                     </div>
                     <div class="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-                        <code class="flex-1 text-sm font-mono text-amber-300 select-all break-all">
+                        <code class="flex-1 text-sm font-mono text-amber-300 break-all">
                             {{ showNewSecret ? newSecret : masked(newSecret) }}
                         </code>
                         <button
@@ -262,10 +260,10 @@ IRIS_API_URL={{ appUrl }}</pre>
 
                         <!-- Key row -->
                         <div class="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-2.5">
-                            <div class="shrink-0">
+                            <div class="shrink-0 w-8">
                                 <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Key</span>
                             </div>
-                            <code class="flex-1 text-xs font-mono text-muted-foreground select-all break-all">
+                            <code class="flex-1 text-xs font-mono text-muted-foreground break-all">
                                 {{ isRevealed(cred.id, 'key') ? cred.api_key : masked(cred.api_key) }}
                             </code>
                             <button
@@ -280,11 +278,11 @@ IRIS_API_URL={{ appUrl }}</pre>
 
                         <!-- Secret row -->
                         <div class="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
-                            <div class="shrink-0">
+                            <div class="shrink-0 w-8">
                                 <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400/80">Secret</span>
                             </div>
-                            <code class="flex-1 text-xs font-mono text-amber-300/60 select-all break-all">
-                                {{ isRevealed(cred.id, 'secret') ? '(hashed — not recoverable)' : '••••••••••••••••••••••••••••••••' }}
+                            <code class="flex-1 text-xs font-mono text-amber-300/60 break-all">
+                                {{ isRevealed(cred.id, 'secret') ? '(hashed — not recoverable)' : masked(cred.api_key) }}
                             </code>
                             <button
                                 @click="toggle(cred.id, 'secret')"

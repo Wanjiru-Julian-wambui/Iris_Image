@@ -19,7 +19,7 @@ class ApiCredentialController extends Controller
                 'id'           => $c->id,
                 'label'        => $c->label,
                 'api_key'      => $c->api_key,
-                'api_secret'   => $c->api_secret,      // <-- ADD THIS (hashed, for reveal detection)
+                'api_secret'   => $c->api_secret,
                 'last_used_at' => $c->last_used_at?->diffForHumans(),
                 'created_at'   => $c->created_at->toDateString(),
             ]);
@@ -27,7 +27,7 @@ class ApiCredentialController extends Controller
         return Inertia::render('settings/ApiCredentials', [
             'credentials' => $credentials,
             'appUrl'      => config('app.url'),
-            'flash'       => [                          // <-- ENSURE FLASH IS PASSED
+            'flash'       => [
                 'new_key'    => session('new_key'),
                 'new_secret' => session('new_secret'),
             ],
