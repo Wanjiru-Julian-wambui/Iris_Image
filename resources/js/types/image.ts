@@ -12,10 +12,78 @@ export interface Image {
     height:         number;
     exif_stripped:  boolean;
     is_private:     boolean;
+    caption?:       string;
+    alt_text?:      string;
+    tags?:          Tag[];
+    notes?:         ImageNote[];
+    reactions?:     Record<string, number>;
+    user_reaction?: string | null;
+    versions?:      ImageVersion[];
     uploaded_by?:   import('./index').User;
     shared_links?:  import('./index').SharedLink[];
     created_at:     string;
     updated_at:     string;
+}
+
+export interface Tag {
+    id:         number;
+    name:       string;
+    slug:       string;
+    created_at: string;
+}
+
+export interface ImageNote {
+    id:         number;
+    body:       string;
+    created_at: string;
+    user:       {
+        id:     number;
+        name:   string;
+        avatar: string | null;
+    };
+}
+
+export interface ImageVersion {
+    id:             number;
+    version_number: number;
+    url:            string;
+    thumbnail_url:  string;
+    size:           number;
+    size_human:     string;
+    width:          number;
+    height:         number;
+    label:          string | null;
+    change_note:    string | null;
+    created_at:     string;
+}
+
+export interface ImageReaction {
+    id:         number;
+    emoji:      string;
+    user?:      {
+        id:     number;
+        name:   string;
+    };
+    created_at: string;
+}
+
+export interface ImagePoll {
+    id:           number;
+    question:     string;
+    public_token: string;
+    public_url:   string;
+    image_a:      Image;
+    image_b:      Image;
+    results:      {
+        total:     number;
+        a_count:   number;
+        b_count:   number;
+        a_percent: number;
+        b_percent: number;
+    };
+    has_voted:    boolean;
+    user_vote:    'a' | 'b' | null;
+    created_at:   string;
 }
 
 export interface SharedLink {

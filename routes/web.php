@@ -12,6 +12,10 @@ use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\PublicAlbumController;
 use App\Http\Controllers\PublicImageController;
 use App\Http\Controllers\ImageNoteController;
+use App\Http\Controllers\TagController;
+use App\Http\Controllers\ImagePollController;
+use App\Http\Controllers\ImageReactionController;
+use App\Http\Controllers\ImageVersionController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -21,6 +25,12 @@ Route::inertia('/', 'Welcome', [
 
 Route::get('/share/{token}',  [SharedLinkController::class, 'show'])->name('shared-links.show');
 Route::post('/share/{token}', [SharedLinkController::class, 'verify'])->name('shared-links.verify');
+// Public routes (no auth required)
+Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('public.image');
+Route::post('/i/{image}/react', [ImageReactionController::class, 'store'])->name('images.react');
+Route::get('/poll/{token}', [ImagePollController::class, 'show'])->name('polls.show');
+Route::post('/poll/{token}/vote', [ImagePollController::class, 'vote'])->name('polls.vote');
+
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
@@ -38,6 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/images/create',         [ImageController::class, 'create'])->name('images.create');
         Route::delete('/images/bulk',        [ImageController::class, 'bulkDestroy'])->name('images.bulk-destroy');
         Route::post('/images/reorder',       [ImageController::class, 'reorder'])->name('images.reorder');
+        Route::post('/images/batch-tag', [ImageController::class, 'batchTag'])->name('images.batch-tag');
 
         // Wildcard image routes AFTER
         Route::get('/images/{image}',          [ImageController::class, 'show'])->name('images.show');
@@ -45,10 +56,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/images/{image}/download', [ImageController::class, 'download'])->name('images.download');
         Route::put('/images/{image}',          [ImageController::class, 'update'])->name('images.update');
 
+         // Versions
+         Route::post('/images/{image}/versions', [ImageVersionController::class, 'store'])->name('images.versions.store');
+         Route::get('/images/{image}/versions', [ImageVersionController::class, 'index'])->name('images.versions.index');
+         Route::get('/images/{image}/versions/{version}/download', [ImageVersionController::class, 'download'])->name('images.versions.download');
+         Route::post('/images/{image}/versions/{version}/restore', [ImageVersionController::class, 'restore'])->name('images.versions.restore');
+         Route::put('/images/{image}/versions/{version}', [ImageVersionController::class, 'updateLabel'])->name('images.versions.update');
+         Route::delete('/images/{image}/versions/{version}', [ImageVersionController::class, 'destroy'])->name('images.versions.destroy');
+
         // Image notes
         Route::post('/images/{image}/notes',          [ImageNoteController::class, 'store'])->name('images.notes.store');
         Route::put('/images/{image}/notes/{note}',    [ImageNoteController::class, 'update'])->name('images.notes.update');
         Route::delete('/images/{image}/notes/{note}', [ImageNoteController::class, 'destroy'])->name('images.notes.destroy');
+
+        // Tags
+        Route::get('/tags', [TagController::class, 'index'])->name('tags.index');
+        Route::post('/tags', [TagController::class, 'store'])->name('tags.store');
+        Route::delete('/tags/{tag}', [TagController::class, 'destroy'])->name('tags.destroy');
+
+        // Polls
+        Route::get('/polls', [ImagePollController::class, 'index'])->name('polls.index');
+        Route::get('/polls/create', [ImagePollController::class, 'create'])->name('polls.create');
+        Route::post('/polls', [ImagePollController::class, 'store'])->name('polls.store');
+        Route::delete('/polls/{poll}', [ImagePollController::class, 'destroy'])->name('polls.destroy');
 
         Route::get('/gallery', [GalleryController::class, 'index'])->name('gallery');
 

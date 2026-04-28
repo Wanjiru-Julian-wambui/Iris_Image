@@ -86,6 +86,16 @@ class User extends Authenticatable
         return $this->hasMany(ApiCredential::class);
     }
 
+     public function tags(): HasMany
+    {
+        return $this->hasMany(Tag::class)->orderBy('name');
+    }
+
+    public function polls(): HasMany
+    {
+        return $this->hasMany(ImagePoll::class)->latest();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Accessors
@@ -148,4 +158,5 @@ class User extends Authenticatable
     {
         return ($this->storage_used + $bytes) <= $this->storageLimit();
     }
+    
 }

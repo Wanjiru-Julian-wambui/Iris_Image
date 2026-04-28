@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Image;
+use App\Models\ImageVersion;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -120,14 +121,147 @@ class ImageService
     }
 
     /**
+     * Replace an image with a new file, saving the old as a version.
+     */
+    public function replace(
+        Image        $image,
+        UploadedFile $file,
+        array        $options = [],
+        ?string      $label = null,
+        ?string      $changeNote = null,
+    ): Image {
+        $stripExif = $options['strip_exif'] ?? true;
+
+        abort_unless(
+            $this->storageService->hasSpace($image->user, $file->getSize()),
+            403,
+            'Storage limit reached.'
+        );
+
+        return DB::transaction(function () use ($image, $file, $stripExif, $label, $changeNote) {
+            $disk = config('filesystems.default');
+
+            // Save current state as a version
+            $image->versions()->create([
+                'path'           => $image->path,
+                'url'            => $image->url,
+                'thumbnail_path' => $image->thumbnail_path,
+                'thumbnail_url'  => $image->thumbnail_url,
+                'size'           => $image->size,
+                'width'          => $image->width,
+                'height'         => $image->height,
+                'version_number' => $image->next_version_number,
+                'label'          => $label,
+                'change_note'    => $changeNote,
+            ]);
+
+            // Get dimensions
+            [$width, $height] = $this->getDimensions($file);
+
+            // Strip EXIF
+            $exifStripped = false;
+            if ($stripExif) {
+                $localPath = $file->getRealPath();
+                if ($localPath && file_exists($localPath)) {
+                    $exifStripped = $this->exifService->strip($localPath);
+                }
+            }
+
+            $hash = hash_file('sha256', $file->getRealPath());
+
+            // Upload new file
+            $newPath = $this->storageService->store($file, $image->user);
+            $newUrl = Storage::disk($disk)->url($newPath);
+
+            // Delete old file from storage
+            Storage::disk($disk)->delete($image->path);
+
+            // Update image with new data
+            $sizeDiff = $file->getSize() - $image->size;
+
+            $image->update([
+                'path'          => $newPath,
+                'url'           => $newUrl,
+                'thumbnail_path'=> null,
+                'thumbnail_url' => $newUrl,
+                'size'          => $file->getSize(),
+                'width'         => $width,
+                'height'        => $height,
+                'hash'          => $hash,
+                'exif_stripped' => $exifStripped,
+                'original_name' => $file->getClientOriginalName(),
+            ]);
+
+            // Update user storage
+            $image->user->increment('storage_used', $sizeDiff);
+
+            return $image->fresh();
+        });
+    }
+
+    /**
+     * Restore an image to a previous version.
+     */
+    public function restoreVersion(Image $image, ImageVersion $version): Image
+    {
+        abort_unless($version->image_id === $image->id, 403, 'Version does not belong to this image.');
+
+        return DB::transaction(function () use ($image, $version) {
+            $disk = config('filesystems.default');
+
+            // Save current state as a new version
+            $image->versions()->create([
+                'path'           => $image->path,
+                'url'            => $image->url,
+                'thumbnail_path' => $image->thumbnail_path,
+                'thumbnail_url'  => $image->thumbnail_url,
+                'size'           => $image->size,
+                'width'          => $image->width,
+                'height'         => $image->height,
+                'version_number' => $image->next_version_number,
+                'label'          => 'Auto-saved before restore',
+                'change_note'    => 'Restored from version ' . $version->version_number,
+            ]);
+
+            // Delete current file from storage
+            Storage::disk($disk)->delete($image->path);
+
+            // Restore version data to image
+            $sizeDiff = $version->size - $image->size;
+
+            $image->update([
+                'path'          => $version->path,
+                'url'           => $version->url,
+                'thumbnail_path'=> $version->thumbnail_path,
+                'thumbnail_url' => $version->thumbnail_url,
+                'size'          => $version->size,
+                'width'         => $version->width,
+                'height'        => $version->height,
+            ]);
+
+            // Update user storage
+            $image->user->increment('storage_used', $sizeDiff);
+
+            return $image->fresh();
+        });
+    }
+
+    /**
      * Delete an image from storage and database.
      */
     public function delete(Image $image): void
     {
         $disk = config('filesystems.default');
+
+        // Delete all version files
+        foreach ($image->versions as $version) {
+            Storage::disk($disk)->delete($version->path);
+        }
+
+        // Delete current file
         Storage::disk($disk)->delete($image->path);
 
-        $image->user->decrement('storage_used', $image->size);
+        $image->user->decrement('storage_used', $image->size + $image->versions->sum('size'));
         $image->delete();
     }
 

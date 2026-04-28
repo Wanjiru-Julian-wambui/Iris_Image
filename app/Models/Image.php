@@ -81,12 +81,55 @@ class Image extends Model
             ->withPivot('sort_order');
     }
 
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'image_tag');
+    }
+
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(ImageReaction::class);
+    }
+
+    public function pollsAsA(): HasMany
+    {
+        return $this->hasMany(ImagePoll::class, 'image_a_id');
+    }
+
+    public function pollsAsB(): HasMany
+    {
+        return $this->hasMany(ImagePoll::class, 'image_b_id');
+    }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(ImageVersion::class)
+            ->orderBy('version_number', 'desc');
+    }
+
+    // ─── Scopes ───────────────────────────────────────────────────────────────
+
+    public function scopeSearch($query, string $term)
+    {
+        if (empty($term)) {
+            return $query;
+        }
+
+        $like = '%' . $term . '%';
+
+        return $query->where(function ($q) use ($like, $term) {
+            $q->where('name', 'like', $like)
+              ->orWhere('original_name', 'like', $like)
+              ->orWhere('caption', 'like', $like)
+              ->orWhere('alt_text', 'like', $like)
+              ->orWhereHas('tags', function ($tagQuery) use ($like) {
+                  $tagQuery->where('name', 'like', $like);
+              });
+        });
+    }
+
     // ─── URL Accessors ────────────────────────────────────────────────────────
 
-    /**
-     * Return the stored URL, or compute it from path as a fallback.
-     * This ensures existing records with null url still resolve correctly.
-     */
     public function getUrlAttribute(): string
     {
         if (!empty($this->attributes['url'])) {
@@ -100,16 +143,12 @@ class Image extends Model
         return '';
     }
 
-    /**
-     * Return the stored thumbnail URL, or fall back to the full image URL.
-     */
     public function getThumbnailUrlAttribute(): string
     {
         if (!empty($this->attributes['thumbnail_url'])) {
             return $this->attributes['thumbnail_url'];
         }
 
-        // Fall back to thumbnail_path if available, otherwise the main image
         if (!empty($this->thumbnail_path)) {
             return Storage::disk(config('filesystems.default'))->url($this->thumbnail_path);
         }
@@ -134,6 +173,21 @@ class Image extends Model
             'markdown' => '![' . e($this->alt_text ?? $this->name) . '](' . $url . ')',
             'bbcode'   => '[img]' . $url . '[/img]',
         ];
+    }
+
+    public function getNextVersionNumberAttribute(): int
+    {
+        return ($this->versions()->max('version_number') ?? 0) + 1;
+    }
+
+    public function getReactionCountsAttribute(): array
+    {
+        return $this->reactions()
+            ->selectRaw('emoji, COUNT(*) as count')
+            ->groupBy('emoji')
+            ->orderByDesc('count')
+            ->pluck('count', 'emoji')
+            ->toArray();
     }
 
     public function incrementDownload(): void

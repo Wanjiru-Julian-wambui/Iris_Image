@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ImageUploadRequest;
 use App\Http\Resources\ImageResource;
 use App\Models\Image;
+use App\Models\Tag;
 use App\Services\ImageService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -18,6 +20,7 @@ class ImageController extends Controller
     {
         $images = $request->user()
             ->images()
+            ->with('tags')
             ->orderBy('sort_order', 'asc')
             ->orderBy('created_at', 'desc')
             ->paginate(24);
@@ -52,7 +55,7 @@ class ImageController extends Controller
     {
         abort_unless($image->user_id === auth()->id(), 403);
 
-        $image->load(['user', 'sharedLinks', 'notes.user']);
+        $image->load(['user', 'sharedLinks', 'notes.user', 'tags', 'reactions', 'versions']);
 
         return Inertia::render('images/Show', [
             'image' => new ImageResource($image),
@@ -63,7 +66,8 @@ class ImageController extends Controller
     {
         $images = $request->user()
             ->images()
-            ->when($request->search, fn($q, $s) => $q->where('name', 'like', "%{$s}%"))
+            ->with('tags')
+            ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->sort === 'oldest',   fn($q) => $q->oldest())
             ->when($request->sort === 'largest',  fn($q) => $q->orderByDesc('size'))
             ->when($request->sort === 'smallest', fn($q) => $q->orderBy('size'))
@@ -139,5 +143,76 @@ class ImageController extends Controller
         $image->incrementDownload();
 
         return redirect($image->url);
+    }
+
+    public function replace(Request $request, Image $image)
+    {
+        abort_unless($image->user_id === auth()->id(), 403);
+
+        $data = $request->validate([
+            'file'        => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,gif,webp,svg,tiff', 'max:102400'],
+            'label'       => ['nullable', 'string', 'max:100'],
+            'change_note' => ['nullable', 'string', 'max:500'],
+            'strip_exif'  => ['sometimes', 'boolean'],
+        ]);
+
+        $this->imageService->replace(
+            $image,
+            $request->file('file'),
+            ['strip_exif' => $data['strip_exif'] ?? config('iris.strip_exif')],
+            $data['label'] ?? null,
+            $data['change_note'] ?? null
+        );
+
+        return back()->with('success', 'Image replaced. Previous version saved.');
+    }
+
+    public function batchTag(Request $request)
+    {
+        $data = $request->validate([
+            'ids'      => ['required', 'array', 'min:1'],
+            'ids.*'    => ['integer', 'exists:images,id'],
+            'tags'     => ['required', 'array'],
+            'tags.*'   => ['string', 'max:50'],
+            'action'   => ['required', 'in:add,remove'],
+        ]);
+
+        $user = $request->user();
+
+        $imageIds = $user->images()
+            ->whereIn('id', $data['ids'])
+            ->pluck('id')
+            ->toArray();
+
+        if (count($imageIds) !== count($data['ids'])) {
+            return back()->with('error', 'Invalid image selection.');
+        }
+
+        $tagIds = [];
+        foreach ($data['tags'] as $tagName) {
+            $name = trim($tagName);
+            if (empty($name)) continue;
+
+            $slug = Str::slug($name);
+            $tag = $user->tags()->firstOrCreate(
+                ['slug' => $slug],
+                ['name' => $name]
+            );
+            $tagIds[] = $tag->id;
+        }
+
+        $images = Image::whereIn('id', $imageIds)->get();
+
+        foreach ($images as $image) {
+            if ($data['action'] === 'add') {
+                $image->tags()->syncWithoutDetaching($tagIds);
+            } else {
+                $image->tags()->detach($tagIds);
+            }
+        }
+
+        $actionText = $data['action'] === 'add' ? 'added to' : 'removed from';
+
+        return back()->with('success', 'Tags ' . $actionText . ' ' . count($images) . ' image(s).');
     }
 }

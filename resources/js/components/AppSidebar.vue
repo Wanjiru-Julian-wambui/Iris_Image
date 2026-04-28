@@ -11,6 +11,8 @@ import {
     Shield,
     Images,
     FolderOpen,
+    Tags,
+    BarChart3
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -43,6 +45,8 @@ const mainNavItems: NavItem[] = [
     { title: 'Plans',           href: '/plans',                       icon: CreditCard  },
     { title: 'API Keys',        href: '/settings/api-keys',           icon: Key         },
     { title: 'API Credentials', href: '/settings/api-credentials',    icon: KeyRound    },
+    { title: 'Tags',      href: '/tags',      icon: Tags },
+    { title: 'Polls',     href: '/polls',     icon: BarChart3 },
 ];
 
 const adminNavItems: NavItem[] = [

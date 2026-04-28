@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Check, Clock, Code, Copy, Download, Eye, Link2, Lock, Share2, Shield, Trash2, Pencil, MessageSquare, X, Send } from 'lucide-vue-next';
+import { ArrowLeft, Check, Clock, Code, Copy, Download, Eye, Link2, Lock, Share2, Shield, Trash2, Pencil, MessageSquare, X, Send, Tag, Plus, ChevronDown, ChevronUp, Save, History, Upload, RotateCcw, Archive, FileImage } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Images',    href: '/images' },
     { title: props.image.name, href: `/images/${props.image.id}` },
 ];
+
+// ─── Tabs ───────────────────────────────────────────────────────────────────
+type Tab = 'details' | 'versions';
+const activeTab = ref<Tab>('details');
 
 // URL / embed copy
 type CopyTarget = 'url' | 'html' | 'markdown' | 'bbcode';
@@ -108,7 +112,13 @@ function saveCaption() {
     });
 }
 
-// Notes
+// ─── Notes (Full CRUD + Collapsible) ────────────────────────────────────────
+const notesExpanded = ref(true);
+const editingNoteId = ref<number | null>(null);
+const editNoteForm = useForm({
+    body: '',
+});
+
 const noteForm = useForm({
     body: '',
 });
@@ -121,12 +131,150 @@ function addNote() {
     });
 }
 
+function startEditNote(note: App.ImageNote) {
+    editingNoteId.value = note.id;
+    editNoteForm.body = note.body;
+}
+
+function cancelEditNote() {
+    editingNoteId.value = null;
+    editNoteForm.reset();
+}
+
+function saveNote(noteId: number) {
+    editNoteForm.put(`/images/${props.image.id}/notes/${noteId}`, {
+        preserveScroll: true,
+        onSuccess: () => { editingNoteId.value = null; },
+    });
+}
+
 function deleteNote(noteId: number) {
     if (!confirm('Delete this note?')) return;
     router.delete(`/images/${props.image.id}/notes/${noteId}`, { preserveScroll: true });
 }
 
-// Watermark download
+// ─── Tags ───────────────────────────────────────────────────────────────────
+const showTagInput = ref(false);
+const tagInput = ref('');
+const addingTag = ref(false);
+
+function addTag() {
+    const name = tagInput.value.trim();
+    if (!name) return;
+
+    addingTag.value = true;
+    router.post('/images/batch-tag', {
+        ids: [props.image.id],
+        tags: [name],
+        action: 'add',
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            addingTag.value = false;
+            tagInput.value = '';
+            showTagInput.value = false;
+        },
+    });
+}
+
+function removeTag(tagId: number) {
+    const tag = props.image.tags?.find(t => t.id === tagId);
+    if (!tag) return;
+
+    router.post('/images/batch-tag', {
+        ids: [props.image.id],
+        tags: [tag.name],
+        action: 'remove',
+    }, {
+        preserveScroll: true,
+    });
+}
+
+// ─── Versions ───────────────────────────────────────────────────────────────
+const showReplaceDialog = ref(false);
+const replaceFile = ref<File | null>(null);
+const replacePreview = ref<string | null>(null);
+const replaceLabel = ref('');
+const replaceNote = ref('');
+const replacing = ref(false);
+
+function onReplaceFile(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (input.files?.[0]) {
+        replaceFile.value = input.files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => replacePreview.value = e.target?.result as string;
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function submitReplace() {
+    if (!replaceFile.value) return;
+
+    replacing.value = true;
+    const formData = new FormData();
+    formData.append('file', replaceFile.value);
+    if (replaceLabel.value) formData.append('label', replaceLabel.value);
+    if (replaceNote.value) formData.append('change_note', replaceNote.value);
+
+    router.post(`/images/${props.image.id}/replace`, formData, {
+        forceFormData: true,
+        preserveScroll: true,
+        onFinish: () => {
+            replacing.value = false;
+            showReplaceDialog.value = false;
+            replaceFile.value = null;
+            replacePreview.value = null;
+            replaceLabel.value = '';
+            replaceNote.value = '';
+        },
+    });
+}
+
+function restoreVersion(versionId: number) {
+    if (!confirm('Restore this version? The current image will be saved as a new version.')) return;
+    router.post(`/images/${props.image.id}/versions/${versionId}/restore`, {}, {
+        preserveScroll: true,
+    });
+}
+
+function downloadVersion(versionId: number) {
+    window.open(`/images/${props.image.id}/versions/${versionId}/download`, '_blank');
+}
+
+function deleteVersion(versionId: number) {
+    if (!confirm('Delete this version permanently?')) return;
+    router.delete(`/images/${props.image.id}/versions/${versionId}`, {
+        preserveScroll: true,
+    });
+}
+
+const editingVersionId = ref<number | null>(null);
+const editVersionLabel = ref('');
+const editVersionNote = ref('');
+const savingVersionLabel = ref(false);
+
+function startEditVersion(version: App.ImageVersion) {
+    editingVersionId.value = version.id;
+    editVersionLabel.value = version.label ?? '';
+    editVersionNote.value = version.change_note ?? '';
+}
+
+function saveVersionLabel(versionId: number) {
+    savingVersionLabel.value = true;
+    router.put(`/images/${props.image.id}/versions/${versionId}`, {
+        label: editVersionLabel.value || null,
+        change_note: editVersionNote.value || null,
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            savingVersionLabel.value = false;
+            editingVersionId.value = null;
+        },
+    });
+}
+
+// ─── Watermark download ─────────────────────────────────────────────────────
 const useWatermark  = ref(false);
 const wmText        = ref('Iris');
 const wmPosition    = ref('bottom-right');
@@ -165,11 +313,10 @@ async function download() {
     }
 }
 
-// EXIF viewer
+// ─── EXIF viewer ────────────────────────────────────────────────────────────
 const showExif = ref(false);
 const { exif, loading: exifLoading, readFromFile, fileHasExif } = useExif();
 
-// Load EXIF from image URL
 async function loadExif() {
     showExif.value = !showExif.value;
     if (showExif.value && !exif.value) {
@@ -198,6 +345,10 @@ async function loadExif() {
                     </Button>
                 </Link>
                 <div class="flex items-center gap-2">
+                    <Button variant="outline" size="sm" class="gap-2" @click="showReplaceDialog = true">
+                        <Upload class="h-4 w-4" />
+                        Replace
+                    </Button>
                     <Button variant="outline" size="sm" class="gap-2" @click="showShareDialog = true">
                         <Share2 class="h-4 w-4" />
                         Share
@@ -209,7 +360,30 @@ async function loadExif() {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Tabs -->
+            <div class="flex items-center gap-1 border-b border-border mb-6">
+                <button
+                    @click="activeTab = 'details'"
+                    class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
+                    :class="activeTab === 'details' ? 'border-violet-500 text-violet-400' : 'border-transparent text-muted-foreground hover:text-foreground'"
+                >
+                    Details
+                </button>
+                <button
+                    @click="activeTab = 'versions'"
+                    class="px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
+                    :class="activeTab === 'versions' ? 'border-violet-500 text-violet-400' : 'border-transparent text-muted-foreground hover:text-foreground'"
+                >
+                    <History class="h-3.5 w-3.5" />
+                    Versions
+                    <Badge v-if="image.versions?.length" variant="secondary" class="text-[10px] h-4 px-1">
+                        {{ image.versions.length }}
+                    </Badge>
+                </button>
+            </div>
+
+            <!-- Details Tab -->
+            <div v-if="activeTab === 'details'" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <!-- Image preview -->
                 <div class="lg:col-span-2 space-y-4">
                     <div class="rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center min-h-[300px]">
@@ -292,6 +466,42 @@ async function loadExif() {
                         <Badge variant="secondary">{{ image.extension.toUpperCase() }}</Badge>
                         <Badge v-if="image.is_private" variant="outline" class="gap-1"><Eye class="h-3 w-3" /> Private</Badge>
                         <Badge v-if="image.exif_stripped" variant="outline" class="gap-1"><Shield class="h-3 w-3" /> EXIF stripped</Badge>
+                    </div>
+
+                    <!-- Tags section -->
+                    <div class="rounded-xl border border-border bg-card p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <Tag class="h-4 w-4 text-violet-400" />
+                                <h3 class="text-sm font-semibold">Tags</h3>
+                            </div>
+                            <Button variant="ghost" size="sm" class="h-7 w-7 p-0" @click="showTagInput = !showTagInput">
+                                <Plus class="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <div v-if="image.tags?.length" class="flex flex-wrap gap-1.5">
+                            <div v-for="tag in image.tags" :key="tag.id" class="group flex items-center gap-1 rounded-full bg-violet-500/10 px-2.5 py-1 text-xs text-violet-400 border border-violet-500/20">
+                                <span>{{ tag.name }}</span>
+                                <button @click="removeTag(tag.id)" class="opacity-0 group-hover:opacity-100 transition-opacity text-violet-400 hover:text-rose-400">
+                                    <X class="h-3 w-3" />
+                                </button>
+                            </div>
+                        </div>
+                        <p v-else class="text-xs text-muted-foreground">No tags yet</p>
+
+                        <div v-if="showTagInput" class="flex gap-2">
+                            <Input
+                                v-model="tagInput"
+                                placeholder="Add a tag..."
+                                class="text-sm h-8"
+                                @keydown.enter.prevent="addTag"
+                            />
+                            <Button size="sm" class="h-8 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90" :disabled="addingTag || !tagInput.trim()" @click="addTag">
+                                <Check v-if="addingTag" class="h-3 w-3 animate-spin" />
+                                <Plus v-else class="h-3 w-3" />
+                            </Button>
+                        </div>
                     </div>
 
                     <!-- Metadata -->
@@ -393,41 +603,73 @@ async function loadExif() {
                         </Button>
                     </div>
 
-                    <!-- Notes panel -->
-                                       <!-- Notes panel -->
-                    <div class="rounded-xl border border-border bg-card p-4 space-y-3">
-                        <div class="flex items-center gap-2">
-                            <MessageSquare class="h-4 w-4 text-violet-400" />
-                            <h3 class="text-sm font-semibold">Notes</h3>
-                        </div>
-
-                        <!-- Add note -->
-                        <form @submit.prevent="addNote" class="flex gap-2">
-                            <Input v-model="noteForm.body" placeholder="Add a note..." class="flex-1 text-sm" />
-                            <Button type="submit" size="sm" :disabled="noteForm.processing || !noteForm.body.trim()" class="bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90">
-                                <Send class="h-3 w-3" />
-                            </Button>
-                        </form>
-
-                        <!-- Notes list -->
-                        <div v-if="image.notes?.length" class="space-y-2 max-h-60 overflow-y-auto">
-                            <div v-for="note in image.notes" :key="note.id" class="rounded-lg bg-muted/40 p-3 space-y-1">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <div class="h-5 w-5 rounded-full bg-violet-500/15 flex items-center justify-center text-[10px] font-bold text-violet-400">
-                                            {{ note.user.name.charAt(0).toUpperCase() }}
-                                        </div>
-                                        <span class="text-xs font-medium">{{ note.user.name }}</span>
-                                        <span class="text-[10px] text-muted-foreground">{{ note.created_at }}</span>
-                                    </div>
-                                    <button @click="deleteNote(note.id)" class="text-muted-foreground hover:text-rose-400 transition-colors">
-                                        <X class="h-3 w-3" />
-                                    </button>
-                                </div>
-                                <p class="text-xs text-foreground whitespace-pre-wrap">{{ note.body }}</p>
+                    <!-- Notes Panel -->
+                    <div class="rounded-xl border border-border bg-card overflow-hidden">
+                        <button
+                            @click="notesExpanded = !notesExpanded"
+                            class="flex items-center justify-between w-full p-4 text-sm font-semibold hover:bg-muted/50 transition-colors"
+                        >
+                            <div class="flex items-center gap-2">
+                                <MessageSquare class="h-4 w-4 text-violet-400" />
+                                <span>Notes</span>
+                                <Badge v-if="image.notes?.length" variant="secondary" class="text-[10px] h-4 px-1.5">
+                                    {{ image.notes.length }}
+                                </Badge>
                             </div>
+                            <ChevronUp v-if="notesExpanded" class="h-4 w-4 text-muted-foreground" />
+                            <ChevronDown v-else class="h-4 w-4 text-muted-foreground" />
+                        </button>
+
+                        <div v-show="notesExpanded" class="px-4 pb-4 space-y-3">
+                            <form @submit.prevent="addNote" class="flex gap-2">
+                                <Input v-model="noteForm.body" placeholder="Add a private note..." class="flex-1 text-sm" />
+                                <Button type="submit" size="sm" :disabled="noteForm.processing || !noteForm.body.trim()" class="bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90">
+                                    <Send class="h-3 w-3" />
+                                </Button>
+                            </form>
+
+                            <div v-if="image.notes?.length" class="space-y-2 max-h-72 overflow-y-auto">
+                                <div v-for="note in image.notes" :key="note.id" class="rounded-lg bg-muted/40 p-3 space-y-1.5">
+                                    <template v-if="editingNoteId !== note.id">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-2">
+                                                <div class="h-5 w-5 rounded-full bg-violet-500/15 flex items-center justify-center text-[10px] font-bold text-violet-400">
+                                                    {{ note.user.name.charAt(0).toUpperCase() }}
+                                                </div>
+                                                <span class="text-xs font-medium">{{ note.user.name }}</span>
+                                                <span class="text-[10px] text-muted-foreground">{{ note.created_at }}</span>
+                                            </div>
+                                            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button @click="startEditNote(note)" class="text-muted-foreground hover:text-violet-400 transition-colors p-0.5">
+                                                    <Pencil class="h-3 w-3" />
+                                                </button>
+                                                <button @click="deleteNote(note.id)" class="text-muted-foreground hover:text-rose-400 transition-colors p-0.5">
+                                                    <Trash2 class="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-foreground whitespace-pre-wrap">{{ note.body }}</p>
+                                    </template>
+                                    <template v-else>
+                                        <div class="space-y-2">
+                                            <textarea
+                                                v-model="editNoteForm.body"
+                                                rows="2"
+                                                class="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                                            ></textarea>
+                                            <div class="flex gap-2">
+                                                <Button size="sm" class="h-7 text-xs bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90" :disabled="editNoteForm.processing" @click="saveNote(note.id)">
+                                                    <Save class="h-3 w-3 mr-1" />
+                                                    {{ editNoteForm.processing ? 'Saving...' : 'Save' }}
+                                                </Button>
+                                                <Button variant="outline" size="sm" class="h-7 text-xs" @click="cancelEditNote">Cancel</Button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                            <p v-else class="text-xs text-muted-foreground text-center py-2">No notes yet</p>
                         </div>
-                        <p v-else class="text-xs text-muted-foreground text-center py-2">No notes yet</p>
                     </div>
 
                     <!-- Active shared links -->
@@ -447,7 +689,170 @@ async function loadExif() {
                     </div>
                 </div>
             </div>
+
+            <!-- Versions Tab -->
+            <div v-else class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold">Version History</h2>
+                        <p class="text-sm text-muted-foreground">Previous versions of this image. Restore or download any version.</p>
+                    </div>
+                    <Button variant="outline" size="sm" class="gap-2" @click="showReplaceDialog = true">
+                        <Upload class="h-4 w-4" />
+                        Upload New Version
+                    </Button>
+                </div>
+
+                <!-- Current version -->
+                <div class="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <Badge class="bg-violet-500 text-white border-0">Current</Badge>
+                        <span class="text-sm font-medium">{{ image.name }}</span>
+                        <span class="text-xs text-muted-foreground ml-auto">{{ image.size_human }} · {{ image.width }}×{{ image.height }}</span>
+                    </div>
+                    <div class="rounded-lg overflow-hidden bg-muted max-w-xs">
+                        <img :src="image.thumbnail_url" class="w-full h-32 object-cover" />
+                    </div>
+                </div>
+
+                <!-- Previous versions -->
+                <div v-if="image.versions?.length" class="space-y-3">
+                    <div v-for="version in image.versions" :key="version.id"
+                         class="group rounded-xl border border-border bg-card p-4 hover:border-violet-500/30 transition-colors">
+                        <div class="flex items-start gap-4">
+                            <div class="shrink-0 rounded-lg overflow-hidden bg-muted w-24 h-24">
+                                <img :src="version.thumbnail_url" class="w-full h-full object-cover" />
+                            </div>
+                            <div class="flex-1 min-w-0 space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <Badge variant="secondary" class="text-[10px]">v{{ version.version_number }}</Badge>
+                                    <span class="text-xs text-muted-foreground">{{ version.created_at }}</span>
+                                    <span class="text-xs text-muted-foreground ml-auto">{{ version.size_human }} · {{ version.width }}×{{ version.height }}</span>
+                                </div>
+
+                                <!-- View mode -->
+                                <div v-if="editingVersionId !== version.id">
+                                    <p v-if="version.label" class="text-sm font-medium">{{ version.label }}</p>
+                                    <p v-if="version.change_note" class="text-xs text-muted-foreground">{{ version.change_note }}</p>
+                                </div>
+
+                                <!-- Edit mode -->
+                                <div v-else class="space-y-2">
+                                    <Input v-model="editVersionLabel" placeholder="Version label" class="text-sm h-8" />
+                                    <Input v-model="editVersionNote" placeholder="Change note" class="text-sm h-8" />
+                                    <div class="flex gap-2">
+                                        <Button size="sm" class="h-7 text-xs" :disabled="savingVersionLabel" @click="saveVersionLabel(version.id)">
+                                            {{ savingVersionLabel ? 'Saving...' : 'Save' }}
+                                        </Button>
+                                        <Button variant="outline" size="sm" class="h-7 text-xs" @click="editingVersionId = null">Cancel</Button>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2 pt-1">
+                                    <Button variant="outline" size="sm" class="h-7 text-xs gap-1" @click="restoreVersion(version.id)">
+                                        <RotateCcw class="h-3 w-3" />
+                                        Restore
+                                    </Button>
+                                    <Button variant="outline" size="sm" class="h-7 text-xs gap-1" @click="downloadVersion(version.id)">
+                                        <Download class="h-3 w-3" />
+                                        Download
+                                    </Button>
+                                    <Button variant="ghost" size="sm" class="h-7 text-xs gap-1" @click="startEditVersion(version)">
+                                        <Pencil class="h-3 w-3" />
+                                        Edit
+                                    </Button>
+                                    <Button variant="ghost" size="sm" class="h-7 text-xs gap-1 text-rose-400 hover:text-rose-500 hover:bg-rose-500/10" @click="deleteVersion(version.id)">
+                                        <Trash2 class="h-3 w-3" />
+                                        Delete
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="text-center py-16">
+                    <div class="flex size-16 items-center justify-center rounded-full bg-muted mx-auto mb-4">
+                        <Archive class="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <h3 class="text-lg font-semibold mb-1">No previous versions</h3>
+                    <p class="text-sm text-muted-foreground mb-4">Upload a new version to start tracking history.</p>
+                    <Button class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90" @click="showReplaceDialog = true">
+                        <Upload class="h-4 w-4" />
+                        Upload New Version
+                    </Button>
+                </div>
+            </div>
         </div>
+
+        <!-- Replace/Upload Version Dialog -->
+        <Dialog :open="showReplaceDialog" @update:open="showReplaceDialog = false">
+            <DialogContent class="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Upload New Version</DialogTitle>
+                    <DialogDescription>
+                        Upload a new file to replace the current image. The current version will be saved automatically.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div class="space-y-4 py-2">
+                    <!-- File drop -->
+                    <div
+                        class="relative rounded-xl border-2 border-dashed border-border p-8 text-center cursor-pointer hover:border-violet-500/50 hover:bg-muted/30 transition-colors"
+                        @click="($refs.replaceInput as HTMLInputElement).click()"
+                    >
+                        <input
+                            ref="replaceInput"
+                            type="file"
+                            accept="image/*"
+                            class="hidden"
+                            @change="onReplaceFile"
+                        />
+                        <div v-if="!replacePreview" class="flex flex-col items-center gap-2">
+                            <FileImage class="h-8 w-8 text-muted-foreground" />
+                            <p class="text-sm font-medium">Click to select a new image</p>
+                            <p class="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP, SVG, TIFF · Max 100MB</p>
+                        </div>
+                        <div v-else class="flex items-center gap-3">
+                            <img :src="replacePreview" class="h-16 w-16 rounded-lg object-cover" />
+                            <div class="text-left">
+                                <p class="text-sm font-medium">{{ replaceFile?.name }}</p>
+                                <p class="text-xs text-muted-foreground">{{ replaceFile ? Math.round(replaceFile.size / 1024) + ' KB' : '' }}</p>
+                            </div>
+                            <Button variant="ghost" size="sm" class="ml-auto" @click.stop="replaceFile = null; replacePreview = null">Change</Button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label class="text-xs">Version label (optional)</Label>
+                        <Input v-model="replaceLabel" placeholder="e.g. Final edit, Cropped, etc." />
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label class="text-xs">Change note (optional)</Label>
+                        <textarea
+                            v-model="replaceNote"
+                            rows="2"
+                            class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                            placeholder="What changed in this version?"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" @click="showReplaceDialog = false">Cancel</Button>
+                    <Button
+                        class="bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
+                        :disabled="!replaceFile || replacing"
+                        @click="submitReplace"
+                    >
+                        <Upload v-if="!replacing" class="h-4 w-4 mr-1" />
+                        <span v-else class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-1" />
+                        {{ replacing ? 'Uploading...' : 'Upload Version' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
         <!-- Delete Dialog -->
         <Dialog :open="showDeleteDialog" @update:open="showDeleteDialog = false">
@@ -456,7 +861,7 @@ async function loadExif() {
                     <DialogTitle>Delete image</DialogTitle>
                     <DialogDescription>
                         Are you sure you want to delete <strong>{{ image.name }}</strong>?
-                        This cannot be undone and all shared links will be removed.
+                        This cannot be undone and all shared links, versions, and notes will be removed.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>

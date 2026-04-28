@@ -33,6 +33,9 @@ class ImageResource extends JsonResource
             'created_at'         => $this->created_at->diffForHumans(),
             'shared_links'       => SharedLinkResource::collection($this->whenLoaded('sharedLinks')),
             'notes'              => ImageNoteResource::collection($this->whenLoaded('notes')),
+            'tags'               => TagResource::collection($this->whenLoaded('tags')),
+            'reactions'          => $this->whenCounted('reactions', fn() => $this->reaction_counts),
+            'versions'           => ImageVersionResource::collection($this->whenLoaded('versions')),
             'user'               => $this->whenLoaded('user', fn() => [
                 'id'   => $this->user->id,
                 'name' => $this->user->name,
