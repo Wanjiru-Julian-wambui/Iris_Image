@@ -25,6 +25,7 @@ Route::inertia('/', 'Welcome', [
 
 Route::get('/share/{token}',  [SharedLinkController::class, 'show'])->name('shared-links.show');
 Route::post('/share/{token}', [SharedLinkController::class, 'verify'])->name('shared-links.verify');
+
 // Public routes (no auth required)
 Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('public.image');
 Route::post('/i/{image}/react', [ImageReactionController::class, 'store'])->name('images.react');
@@ -48,7 +49,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/images/create',         [ImageController::class, 'create'])->name('images.create');
         Route::delete('/images/bulk',        [ImageController::class, 'bulkDestroy'])->name('images.bulk-destroy');
         Route::post('/images/reorder',       [ImageController::class, 'reorder'])->name('images.reorder');
-        Route::post('/images/batch-tag', [ImageController::class, 'batchTag'])->name('images.batch-tag');
+        Route::post('/images/batch-tag',     [ImageController::class, 'batchTag'])->name('images.batch-tag');
 
         // Wildcard image routes AFTER
         Route::get('/images/{image}',          [ImageController::class, 'show'])->name('images.show');
@@ -56,13 +57,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/images/{image}/download', [ImageController::class, 'download'])->name('images.download');
         Route::put('/images/{image}',          [ImageController::class, 'update'])->name('images.update');
 
-         // Versions
-         Route::post('/images/{image}/versions', [ImageVersionController::class, 'store'])->name('images.versions.store');
-         Route::get('/images/{image}/versions', [ImageVersionController::class, 'index'])->name('images.versions.index');
-         Route::get('/images/{image}/versions/{version}/download', [ImageVersionController::class, 'download'])->name('images.versions.download');
-         Route::post('/images/{image}/versions/{version}/restore', [ImageVersionController::class, 'restore'])->name('images.versions.restore');
-         Route::put('/images/{image}/versions/{version}', [ImageVersionController::class, 'updateLabel'])->name('images.versions.update');
-         Route::delete('/images/{image}/versions/{version}', [ImageVersionController::class, 'destroy'])->name('images.versions.destroy');
+        // Versions
+        Route::post('/images/{image}/versions',                          [ImageVersionController::class, 'store'])->name('images.versions.store');
+        Route::get('/images/{image}/versions',                           [ImageVersionController::class, 'index'])->name('images.versions.index');
+        Route::get('/images/{image}/versions/{version}/download',        [ImageVersionController::class, 'download'])->name('images.versions.download');
+        Route::post('/images/{image}/versions/{version}/restore',        [ImageVersionController::class, 'restore'])->name('images.versions.restore');
+        Route::put('/images/{image}/versions/{version}',                 [ImageVersionController::class, 'updateLabel'])->name('images.versions.update');
+        Route::delete('/images/{image}/versions/{version}',              [ImageVersionController::class, 'destroy'])->name('images.versions.destroy');
 
         // Image notes
         Route::post('/images/{image}/notes',          [ImageNoteController::class, 'store'])->name('images.notes.store');
@@ -70,15 +71,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/images/{image}/notes/{note}', [ImageNoteController::class, 'destroy'])->name('images.notes.destroy');
 
         // Tags
-        Route::get('/tags', [TagController::class, 'index'])->name('tags.index');
-        Route::post('/tags', [TagController::class, 'store'])->name('tags.store');
+        Route::get('/tags',          [TagController::class, 'index'])->name('tags.index');
+        Route::post('/tags',         [TagController::class, 'store'])->name('tags.store');
         Route::delete('/tags/{tag}', [TagController::class, 'destroy'])->name('tags.destroy');
 
         // Polls
-        Route::get('/polls', [ImagePollController::class, 'index'])->name('polls.index');
-        Route::get('/polls/create', [ImagePollController::class, 'create'])->name('polls.create');
-        Route::post('/polls', [ImagePollController::class, 'store'])->name('polls.store');
-        Route::delete('/polls/{poll}', [ImagePollController::class, 'destroy'])->name('polls.destroy');
+        Route::get('/polls',             [ImagePollController::class, 'index'])->name('polls.index');
+        Route::get('/polls/create',      [ImagePollController::class, 'create'])->name('polls.create');
+        Route::post('/polls',            [ImagePollController::class, 'store'])->name('polls.store');
+        Route::delete('/polls/{poll}',   [ImagePollController::class, 'destroy'])->name('polls.destroy');
 
         Route::get('/gallery', [GalleryController::class, 'index'])->name('gallery');
 
@@ -100,10 +101,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/plans/{plan}',   [PlanController::class, 'destroy'])->name('plans.destroy');
 
         // Sanctum Bearer token keys
-        Route::get('/settings/api-keys',          [ApiKeyController::class, 'index'])->name('api-keys.index');
-        Route::post('/settings/api-keys',         [ApiKeyController::class, 'store'])->name('api-keys.store');
-        Route::delete('/settings/api-keys/{id}',  [ApiKeyController::class, 'destroy'])->name('api-keys.destroy');
-        Route::delete('/settings/api-keys',       [ApiKeyController::class, 'destroyAll'])->name('api-keys.destroy-all');
+        Route::get('/settings/api-keys',         [ApiKeyController::class, 'index'])->name('api-keys.index');
+        Route::post('/settings/api-keys',        [ApiKeyController::class, 'store'])->name('api-keys.store');
+        Route::delete('/settings/api-keys/{id}', [ApiKeyController::class, 'destroy'])->name('api-keys.destroy');
+        Route::delete('/settings/api-keys',      [ApiKeyController::class, 'destroyAll'])->name('api-keys.destroy-all');
 
         // API Key + Secret credentials
         Route::get('/settings/api-credentials',         [ApiCredentialController::class, 'index'])->name('api-credentials.index');
@@ -126,8 +127,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/a/{token}',         [PublicAlbumController::class, 'show'])->name('albums.public.show');
         Route::post('/a/{token}/verify', [PublicAlbumController::class, 'verify'])->name('albums.public.verify');
 
-        // Public image
-        Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('images.public.show');
+        // NOTE: /i/{token} is intentionally NOT duplicated here.
+        // The public route above handles it for all users (auth or not).
+        // Having it here caused a named route conflict breaking image URL resolution in polls.
     });
 
     Route::middleware('storage.limit')->group(function () {

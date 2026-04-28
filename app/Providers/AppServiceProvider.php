@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
@@ -18,6 +19,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        JsonResource::withoutWrapping();
+
         $this->configureDefaults();
         $this->configureStorage();
     }
@@ -47,13 +50,8 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        // Force HTTPS on all generated URLs in production
         URL::forceScheme('https');
 
-        // Create the storage symlink if it doesn't exist yet.
-        // Laravel Cloud has an ephemeral filesystem so the symlink
-        // created during deployment may not persist. This recreates
-        // it on every boot so /storage/ URLs always resolve.
         $link   = public_path('storage');
         $target = storage_path('app/public');
 
