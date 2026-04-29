@@ -10,10 +10,6 @@ use Inertia\Inertia;
 
 class TagController extends Controller
 {
-    /**
-     * List all tags belonging to the authenticated user (via their images).
-     * Returns an Inertia response so the Tags/Index.vue page receives `tags` as a prop.
-     */
     public function index(Request $request)
     {
         $tags = Tag::whereHas('images', fn ($q) => $q->where('user_id', $request->user()->id))
@@ -26,9 +22,6 @@ class TagController extends Controller
         ]);
     }
 
-    /**
-     * Create a new tag (unique by slug).
-     */
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -46,9 +39,6 @@ class TagController extends Controller
         return back()->with('success', 'Tag created.');
     }
 
-    /**
-     * Delete a tag (removes it from all images via cascade on the pivot).
-     */
     public function destroy(Tag $tag)
     {
         $tag->delete();
@@ -56,9 +46,6 @@ class TagController extends Controller
         return back()->with('success', 'Tag deleted.');
     }
 
-    /**
-     * Batch apply / remove tags from selected images.
-     */
     public function batchTag(Request $request)
     {
         $data = $request->validate([

@@ -21,12 +21,14 @@ class ImageController extends Controller
         $images = $request->user()
             ->images()
             ->with('tags')
+            ->when($request->search, fn($q, $s) => $q->search($s))
             ->orderBy('sort_order', 'asc')
             ->orderBy('created_at', 'desc')
             ->paginate(24);
 
         return Inertia::render('images/Index', [
-            'images' => ImageResource::collection($images),
+            'images'  => ImageResource::collection($images),
+            'filters' => $request->only(['search']),
         ]);
     }
 
@@ -95,7 +97,7 @@ class ImageController extends Controller
     public function bulkDestroy(Request $request)
     {
         $ids = $request->input('ids', []);
-        
+
         $images = $request->user()
             ->images()
             ->whereIn('id', $ids)
@@ -170,11 +172,11 @@ class ImageController extends Controller
     public function batchTag(Request $request)
     {
         $data = $request->validate([
-            'ids'      => ['required', 'array', 'min:1'],
-            'ids.*'    => ['integer', 'exists:images,id'],
-            'tags'     => ['required', 'array'],
-            'tags.*'   => ['string', 'max:50'],
-            'action'   => ['required', 'in:add,remove'],
+            'ids'    => ['required', 'array', 'min:1'],
+            'ids.*'  => ['integer', 'exists:images,id'],
+            'tags'   => ['required', 'array'],
+            'tags.*' => ['string', 'max:50'],
+            'action' => ['required', 'in:add,remove'],
         ]);
 
         $user = $request->user();
@@ -184,7 +186,7 @@ class ImageController extends Controller
             ->pluck('id')
             ->toArray();
 
-        if (count($imageIds) !== count($data['ids'])) {
+        if (empty($imageIds)) {
             return back()->with('error', 'Invalid image selection.');
         }
 
@@ -193,9 +195,8 @@ class ImageController extends Controller
             $name = trim($tagName);
             if (empty($name)) continue;
 
-            $slug = Str::slug($name);
-            $tag = $user->tags()->firstOrCreate(
-                ['slug' => $slug],
+            $tag = Tag::firstOrCreate(
+                ['slug' => Str::slug($name)],
                 ['name' => $name]
             );
             $tagIds[] = $tag->id;
