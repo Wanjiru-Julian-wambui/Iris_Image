@@ -21,7 +21,7 @@ class TagController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'created_at']);
 
-        return Inertia::render('Tags/Index', [
+        return Inertia::render('tags/Index', [
             'tags' => $tags,
         ]);
     }
