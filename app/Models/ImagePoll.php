@@ -64,7 +64,7 @@ class ImagePoll extends Model
     /** Classic A/B votes */
     public function votes(): HasMany
     {
-        return $this->hasMany(ImagePollVote::class);
+        return $this->hasMany(ImagePollVote::class, 'poll_id');
     }
 
     /** Multi-poll votes */
