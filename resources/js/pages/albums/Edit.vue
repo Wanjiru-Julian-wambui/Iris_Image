@@ -17,9 +17,9 @@ const props = defineProps<{
         is_public: boolean;
         has_password: boolean;
         cover_image: { id: number } | null;
-        images: { data: App.ImageResource[] };
+        images: App.ImageResource[];
     };
-    userImages: { data: App.ImageResource[] };
+    userImages: App.ImageResource[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -37,7 +37,7 @@ const form = useForm({
     cover_image_id: props.album.cover_image?.id ?? null,
 });
 
-const existingImageIds = new Set(props.album.images.data.map(i => i.id));
+const existingImageIds = new Set(props.album.images.map(i => i.id));
 const selectedNewImages = ref<Set<number>>(new Set());
 
 function toggleNewImage(id: number) {
@@ -61,8 +61,8 @@ function addImages() {
     });
 }
 
-const availableImages = computed(() => 
-    props.userImages.data.filter(img => !existingImageIds.has(img.id))
+const availableImages = computed(() =>
+    props.userImages.filter(img => !existingImageIds.has(img.id))
 );
 </script>
 

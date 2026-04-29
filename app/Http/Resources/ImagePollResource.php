@@ -9,16 +9,31 @@ class ImagePollResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $isAb   = $this->type === 'ab';
+        $imageA = $isAb ? $this->whenLoaded('imageA') : null;
+        $imageB = $isAb ? $this->whenLoaded('imageB') : null;
+        $images = !$isAb ? $this->whenLoaded('images') : null;
+
         return [
             'id'           => $this->id,
+            'type'         => $this->type,
             'question'     => $this->question,
+            'max_choices'  => $this->max_choices,
             'public_token' => $this->public_token,
             'public_url'   => $this->public_url,
-            'image_a'      => new ImageResource($this->whenLoaded('imageA')),
-            'image_b'      => new ImageResource($this->whenLoaded('imageB')),
+
+            // A/B only
+            'image_a'      => $imageA ? new ImageResource($imageA) : null,
+            'image_b'      => $imageB ? new ImageResource($imageB) : null,
+
+            // Multi only
+            'images'       => $images ? ImageResource::collection($images) : null,
+
             'results'      => $this->results,
             'has_voted'    => $this->has_voted,
-            'user_vote'    => $this->user_vote,
+            'user_vote'    => $this->user_vote,   // ab: 'a'|'b'|null
+            'user_votes'   => $this->user_votes,  // multi: [image_id, ...] | null
+
             'created_at'   => $this->created_at->diffForHumans(),
         ];
     }

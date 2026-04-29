@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import type { BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
-    images: { data: App.ImageResource[] };
+    images: App.ImageResource[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -88,11 +88,11 @@ const hasPassword = computed(() => form.password.length > 0);
                     <p class="text-xs text-muted-foreground">Minimum 4 characters if set</p>
                 </div>
 
-                <div v-if="images.data.length > 0" class="space-y-3">
+                <div v-if="images.length > 0" class="space-y-3">
                     <Label>Select images to add</Label>
                     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                         <div
-                            v-for="image in images.data"
+                            v-for="image in images"
                             :key="image.id"
                             @click="toggleImage(image.id)"
                             class="relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all"

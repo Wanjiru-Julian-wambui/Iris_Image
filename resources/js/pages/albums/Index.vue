@@ -7,19 +7,17 @@ import type { BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
     albums: {
-        data: {
-            id: number;
-            name: string;
-            slug: string;
-            description: string | null;
-            is_public: boolean;
-            has_password: boolean;
-            public_url: string;
-            cover_image: { thumbnail_url: string } | null;
-            images_count: number;
-            created_at: string;
-        }[];
-    };
+        id: number;
+        name: string;
+        slug: string;
+        description: string | null;
+        is_public: boolean;
+        has_password: boolean;
+        public_url: string;
+        cover_image: { thumbnail_url: string } | null;
+        images_count: number;
+        created_at: string;
+    }[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -36,7 +34,7 @@ const breadcrumbs: BreadcrumbItem[] = [
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">Albums</h1>
                     <p class="text-sm text-muted-foreground mt-1">
-                        {{ albums.data.length }} album{{ albums.data.length !== 1 ? 's' : '' }}
+                        {{ albums.length }} album{{ albums.length !== 1 ? 's' : '' }}
                     </p>
                 </div>
                 <Link href="/albums/create">
@@ -47,7 +45,7 @@ const breadcrumbs: BreadcrumbItem[] = [
                 </Link>
             </div>
 
-            <div v-if="albums.data.length === 0" class="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-24 text-center">
+            <div v-if="albums.length === 0" class="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-24 text-center">
                 <div class="flex size-16 items-center justify-center rounded-full bg-muted mb-4">
                     <FolderOpen class="h-8 w-8 text-muted-foreground" />
                 </div>
@@ -63,7 +61,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
             <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <Link
-                    v-for="album in albums.data"
+                    v-for="album in albums"
                     :key="album.id"
                     :href="`/albums/${album.id}`"
                     class="group rounded-2xl border border-border bg-card overflow-hidden hover:border-violet-500/50 transition-all hover:shadow-lg hover:shadow-violet-500/10"

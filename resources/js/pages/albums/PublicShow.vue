@@ -10,13 +10,13 @@ const props = defineProps<{
         user: { name: string };
         created_at: string;
     };
-    images: { data: App.ImageResource[] };
+    images: App.ImageResource[];
 }>();
 </script>
 
 <template>
     <Head :title="album.name" />
-    
+
     <div class="min-h-screen bg-background">
         <div class="max-w-6xl mx-auto px-4 py-8">
             <div class="mb-8">
@@ -27,18 +27,18 @@ const props = defineProps<{
                     {{ album.user.name }}
                     <span>·</span>
                     <ImageIcon class="h-4 w-4" />
-                    {{ images.data.length }} images
+                    {{ images.length }} images
                 </div>
             </div>
 
-            <div v-if="images.data.length === 0" class="text-center py-16">
+            <div v-if="images.length === 0" class="text-center py-16">
                 <FolderOpen class="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p class="text-muted-foreground">This album is empty.</p>
             </div>
 
             <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 <div
-                    v-for="image in images.data"
+                    v-for="image in images"
                     :key="image.id"
                     class="group aspect-square rounded-xl overflow-hidden border border-border bg-muted"
                 >

@@ -23,7 +23,7 @@ const props = defineProps<{
         cover_image: { thumbnail_url: string } | null;
         images_count: number;
     };
-    images: { data: App.ImageResource[] };
+    images: App.ImageResource[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -56,7 +56,7 @@ function removeImage(imageId: number) {
 
 // Drag to reorder
 const gridRef = ref<HTMLElement | null>(null);
-const imagesList = ref([...props.images.data]);
+const imagesList = ref([...props.images]);
 
 const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop, handleDragEnd } = useDraggable(
     gridRef,
@@ -113,7 +113,7 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
             </div>
 
             <!-- Images grid -->
-            <div v-if="images.data.length === 0" class="text-center py-16">
+            <div v-if="images.length === 0" class="text-center py-16">
                 <p class="text-muted-foreground">No images in this album yet.</p>
                 <Link :href="`/albums/${album.id}/edit`">
                     <Button variant="outline" class="mt-4 gap-2">
@@ -139,7 +139,7 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                     }"
                 >
                     <img :src="image.thumbnail_url" class="w-full h-full object-cover" />
-                    
+
                     <!-- Drag handle -->
                     <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <GripVertical class="h-4 w-4 text-white drop-shadow-md" />
