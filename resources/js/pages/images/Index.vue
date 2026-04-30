@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -81,6 +80,15 @@ const wmCustomText       = ref('');
 const wmPosition         = ref('bottom-right');
 const wmOpacity          = ref<number>(60);
 
+function closeDownloadModal() {
+    showDownloadModal.value = false;
+    useWatermark.value      = false;
+    wmCustomText.value      = '';
+    wmTextType.value        = 'site_name';
+    wmPosition.value        = 'bottom-right';
+    wmOpacity.value         = 60;
+}
+
 const positionOptions = [
     { label: 'Bottom right', value: 'bottom-right' },
     { label: 'Bottom left',  value: 'bottom-left'  },
@@ -139,8 +147,8 @@ async function bulkDownload() {
         a.click();
         URL.revokeObjectURL(url);
 
-        selected.value      = new Set();
-        showDownloadModal.value = false;
+        selected.value = new Set();
+        closeDownloadModal();
     } catch {
         alert('Failed to download images.');
     } finally {
@@ -412,7 +420,7 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
         </Dialog>
 
         <!-- Bulk Download + Watermark Modal -->
-        <Dialog :open="showDownloadModal" @update:open="showDownloadModal = false">
+        <Dialog :open="showDownloadModal" @update:open="(val) => { if (!val) closeDownloadModal(); }">
             <DialogContent class="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Download {{ selectedCount }} image{{ selectedCount !== 1 ? 's' : '' }}</DialogTitle>
@@ -428,70 +436,76 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                             <Label class="text-sm font-medium">Add watermark</Label>
                             <p class="text-xs text-muted-foreground">Embed text into downloaded images</p>
                         </div>
-                        <Switch v-model:checked="useWatermark" />
+                        <button
+                            type="button"
+                            role="switch"
+                            :aria-checked="useWatermark"
+                            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            :class="useWatermark ? 'bg-violet-500' : 'bg-input'"
+                            @click.stop="useWatermark = !useWatermark"
+                        >
+                            <span
+                                class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform"
+                                :class="useWatermark ? 'translate-x-5' : 'translate-x-0'"
+                            />
+                        </button>
                     </div>
 
-                    <!-- Watermark options -->
-                    <Transition
-                        enter-active-class="transition-all duration-200"
-                        enter-from-class="opacity-0 -translate-y-1"
-                        leave-active-class="transition-all duration-150"
-                        leave-to-class="opacity-0 -translate-y-1"
-                    >
-                        <div v-if="useWatermark" class="space-y-3 pt-3 border-t border-border">
-                            <!-- Text type selector -->
-                            <div class="space-y-1.5">
-                                <Label class="text-xs text-muted-foreground">Watermark text</Label>
-                                <div class="flex rounded-lg border border-border overflow-hidden">
-                                    <button
-                                        v-for="opt in textTypeOptions"
-                                        :key="opt.value"
-                                        @click="wmTextType = opt.value as any"
-                                        class="flex-1 px-2 py-1.5 text-xs font-medium transition-colors"
-                                        :class="wmTextType === opt.value ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'"
-                                    >
-                                        {{ opt.label }}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Custom text input -->
-                            <div v-if="wmTextType === 'custom'" class="space-y-1">
-                                <Input
-                                    v-model="wmCustomText"
-                                    placeholder="e.g. © Your Name 2026"
-                                    maxlength="60"
-                                    class="text-sm"
-                                />
-                            </div>
-
-                            <!-- Position -->
-                            <div class="space-y-1.5">
-                                <Label class="text-xs text-muted-foreground">Position</Label>
-                                <Select v-model="wmPosition">
-                                    <SelectTrigger class="h-8 text-sm"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="opt in positionOptions" :key="opt.value" :value="opt.value">
-                                            {{ opt.label }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <!-- Opacity -->
-                            <div class="space-y-1.5">
-                                <div class="flex justify-between">
-                                    <Label class="text-xs text-muted-foreground">Opacity</Label>
-                                    <span class="text-xs text-muted-foreground">{{ wmOpacity }}%</span>
-                                </div>
-                                <input v-model="wmOpacity" type="range" min="10" max="100" step="5" class="w-full accent-violet-500" />
+                    <!-- Watermark options — v-show keeps DOM stable, no focus-trap re-trigger -->
+                    <div v-show="useWatermark" class="space-y-3 pt-3 border-t border-border">
+                        <!-- Text type selector -->
+                        <div class="space-y-1.5">
+                            <Label class="text-xs text-muted-foreground">Watermark text</Label>
+                            <div class="flex rounded-lg border border-border overflow-hidden">
+                                <button
+                                    v-for="opt in textTypeOptions"
+                                    :key="opt.value"
+                                    type="button"
+                                    @click.stop="wmTextType = opt.value as any"
+                                    class="flex-1 px-2 py-1.5 text-xs font-medium transition-colors"
+                                    :class="wmTextType === opt.value ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'"
+                                >
+                                    {{ opt.label }}
+                                </button>
                             </div>
                         </div>
-                    </Transition>
+
+                        <!-- Custom text input -->
+                        <div v-show="wmTextType === 'custom'" class="space-y-1">
+                            <Input
+                                v-model="wmCustomText"
+                                placeholder="e.g. © Your Name 2026"
+                                maxlength="60"
+                                class="text-sm"
+                            />
+                        </div>
+
+                        <!-- Position -->
+                        <div class="space-y-1.5">
+                            <Label class="text-xs text-muted-foreground">Position</Label>
+                            <Select v-model="wmPosition">
+                                <SelectTrigger class="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="opt in positionOptions" :key="opt.value" :value="opt.value">
+                                        {{ opt.label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <!-- Opacity -->
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between">
+                                <Label class="text-xs text-muted-foreground">Opacity</Label>
+                                <span class="text-xs text-muted-foreground">{{ wmOpacity }}%</span>
+                            </div>
+                            <input v-model="wmOpacity" type="range" min="10" max="100" step="5" class="w-full accent-violet-500" />
+                        </div>
+                    </div>
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" @click="showDownloadModal = false">Cancel</Button>
+                    <Button variant="outline" @click="closeDownloadModal">Cancel</Button>
                     <Button
                         class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
                         :disabled="downloading || (useWatermark && wmTextType === 'custom' && !wmCustomText.trim())"
