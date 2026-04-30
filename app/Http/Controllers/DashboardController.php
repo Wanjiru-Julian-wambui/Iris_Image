@@ -1,6 +1,5 @@
 <?php
 
-
 namespace App\Http\Controllers;
 
 use App\Models\Image;
@@ -36,9 +35,8 @@ class DashboardController extends Controller
         $uploadHistory = $this->fillDateRange($uploadHistory, $days, 'count');
 
         // ── 2. Storage trend — line chart of cumulative storage used over time ──
-        // Calculate cumulative sum per day based on file_size of images uploaded up to that date
         $storageTrend = DB::table('images')
-            ->selectRaw("DATE(created_at) as date, SUM(file_size) as daily_bytes")
+            ->selectRaw("DATE(created_at) as date, SUM(size) as daily_bytes")
             ->where('user_id', $user->id)
             ->where('created_at', '>=', $since)
             ->groupByRaw("DATE(created_at)")
