@@ -16,6 +16,7 @@ class SharedLink extends Model
         'password',
         'expires_at',
         'view_count',
+        'accessed_at',
     ];
 
     protected $hidden = [
@@ -23,8 +24,9 @@ class SharedLink extends Model
     ];
 
     protected $casts = [
-        'expires_at' => 'datetime',
-        'view_count' => 'integer',
+        'expires_at'  => 'datetime',
+        'view_count'  => 'integer',
+        'accessed_at' => 'datetime',
     ];
 
     protected $appends = [

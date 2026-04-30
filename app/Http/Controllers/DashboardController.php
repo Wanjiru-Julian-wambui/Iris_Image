@@ -31,10 +31,9 @@ class DashboardController extends Controller
                 'count' => (int) $row->count,
             ]);
 
-        // Fill missing days with 0
         $uploadHistory = $this->fillDateRange($uploadHistory, $days, 'count');
 
-        // ── 2. Storage trend — line chart of cumulative storage used over time ──
+        // ── 2. Storage trend — cumulative storage used over time ──
         $storageTrend = DB::table('images')
             ->selectRaw("DATE(created_at) as date, SUM(size) as daily_bytes")
             ->where('user_id', $user->id)
@@ -43,7 +42,6 @@ class DashboardController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Calculate running cumulative total
         $cumulative = 0;
         $storageTrend = $storageTrend->map(function ($row) use (&$cumulative) {
             $cumulative += (int) $row->daily_bytes;
@@ -55,7 +53,7 @@ class DashboardController extends Controller
 
         $storageTrend = $this->fillDateRange($storageTrend, $days, 'bytes', true);
 
-        // ── 3. Link views — line chart of shared link views per day ──
+        // ── 3. Link views — line chart of views per day ──
         $linkViews = DB::table('shared_links')
             ->selectRaw("DATE(accessed_at) as date, COUNT(*) as views")
             ->where('created_by', $user->id)
@@ -76,7 +74,7 @@ class DashboardController extends Controller
             'total_images'    => Image::where('user_id', $user->id)->count(),
             'total_albums'    => $user->albums()->count(),
             'total_links'     => SharedLink::where('created_by', $user->id)->count(),
-            'total_views'     => SharedLink::where('created_by', $user->id)->sum('views') ?? 0,
+            'total_views'     => SharedLink::where('created_by', $user->id)->sum('view_count') ?? 0,
             'storage_used'    => $user->storage_used_human,
             'storage_percent' => $user->storage_percent,
         ];

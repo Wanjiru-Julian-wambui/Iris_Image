@@ -78,6 +78,7 @@ class SharedLinkController extends Controller
         ]);
 
         $link->increment('view_count');
+        $link->update(['accessed_at' => now()]);
 
         return Inertia::render('shared-links/Show', [
             'image' => (new ImageResource($link->image))->resolve(),
