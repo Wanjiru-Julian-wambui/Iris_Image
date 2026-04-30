@@ -37,16 +37,12 @@ class ZipService
 
             // Apply watermark if requested
             if ($watermarkService) {
-                try {
-                    $tempPath = $watermarkService->apply($image, $watermark['text'], [
-                        'position' => $watermark['position'] ?? 'bottom-right',
-                        'opacity'  => $watermark['opacity']  ?? 60,
-                    ]);
-                    $contents = file_get_contents($tempPath);
-                    @unlink($tempPath);
-                } catch (\Throwable) {
-                    // Watermark failed — fall back to original contents
-                }
+                $tempPath = $watermarkService->apply($image, $watermark['text'], [
+                    'position' => $watermark['position'] ?? 'bottom-right',
+                    'opacity'  => (int) ($watermark['opacity'] ?? 60),
+                ]);
+                $contents = file_get_contents($tempPath);
+                @unlink($tempPath);
             }
 
             $filename = $this->uniqueFilename($zip, $image->original_name ?? $image->name);

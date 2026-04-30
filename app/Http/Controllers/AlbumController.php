@@ -41,10 +41,16 @@ class AlbumController extends Controller
 
     public function store(AlbumStoreRequest $request)
     {
-        $album = $request->user()->albums()->create($request->validated());
+        $validated = $request->validated();
 
-        if ($request->has('image_ids')) {
-            $album->images()->attach($request->input('image_ids'));
+        // Pull out image_ids — not a column, handled separately
+        $imageIds = $validated['image_ids'] ?? [];
+        unset($validated['image_ids']);
+
+        $album = $request->user()->albums()->create($validated);
+
+        if (!empty($imageIds)) {
+            $album->images()->attach($imageIds);
         }
 
         return redirect()->route('albums.show', $album->id)
@@ -67,7 +73,8 @@ class AlbumController extends Controller
     {
         abort_unless($album->user_id === $request->user()->id, 403);
 
-        $album->load('images');
+        $album->load(['images', 'coverImage']);
+
         $userImages = $request->user()->images()->latest()->get();
 
         return Inertia::render('albums/Edit', [
@@ -82,7 +89,8 @@ class AlbumController extends Controller
 
         $album->update($request->validated());
 
-        return back()->with('success', 'Album updated.');
+        return redirect()->route('albums.show', $album->id)
+            ->with('success', 'Album updated.');
     }
 
     public function destroy(Album $album)

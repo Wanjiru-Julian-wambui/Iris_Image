@@ -19,8 +19,8 @@ class WatermarkService
         $disk     = config('filesystems.default');
         $contents = Storage::disk($disk)->get($image->path);
 
-        if (!$contents) {
-            throw new \RuntimeException('Image not found on disk.');
+        if ($contents === null) {
+            throw new \RuntimeException("Image not found on disk: {$image->path}");
         }
 
         $gd = $this->createFromBytes($contents, $image->mime_type);

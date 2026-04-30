@@ -253,33 +253,35 @@ class ImageController extends Controller
             ];
         }
 
-        // Single image — stream directly (with optional watermark)
+        // Single image — always stream as a blob (fetch() cannot follow S3 redirects)
         if ($images->count() === 1) {
             $image = $images->first();
             $image->incrementDownload();
 
             if (!empty($watermarkOptions)) {
-                try {
-                    $tempPath = app(\App\Services\WatermarkService::class)->apply(
-                        $image,
-                        $watermarkOptions['text'],
-                        [
-                            'position' => $watermarkOptions['position'],
-                            'opacity'  => $watermarkOptions['opacity'],
-                        ]
-                    );
+                $tempPath = app(\App\Services\WatermarkService::class)->apply(
+                    $image,
+                    $watermarkOptions['text'],
+                    [
+                        'position' => $watermarkOptions['position'],
+                        'opacity'  => (int) $watermarkOptions['opacity'],
+                    ]
+                );
 
-                    return response()->download(
-                        $tempPath,
-                        $image->original_name ?? $image->name
-                    )->deleteFileAfterSend(true);
-                } catch (\Throwable) {
-                    // Fall back to redirect on watermark failure
-                    return redirect($image->url);
-                }
+                return response()->download(
+                    $tempPath,
+                    $image->original_name ?? $image->name
+                )->deleteFileAfterSend(true);
             }
 
-            return redirect($image->url);
+            // No watermark — stream S3 bytes directly so fetch() receives the blob
+            $disk     = config('filesystems.default');
+            $contents = \Illuminate\Support\Facades\Storage::disk($disk)->get($image->path);
+
+            return response($contents, 200, [
+                'Content-Type'        => $image->mime_type,
+                'Content-Disposition' => 'attachment; filename="' . ($image->original_name ?? $image->name) . '"',
+            ]);
         }
 
         // Multiple images — zip (ZipService handles S3 + optional watermark)

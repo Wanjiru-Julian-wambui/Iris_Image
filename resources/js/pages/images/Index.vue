@@ -79,7 +79,7 @@ const useWatermark       = ref(false);
 const wmTextType         = ref<'username' | 'site_name' | 'custom'>('site_name');
 const wmCustomText       = ref('');
 const wmPosition         = ref('bottom-right');
-const wmOpacity          = ref(60);
+const wmOpacity          = ref<number>(60);
 
 const positionOptions = [
     { label: 'Bottom right', value: 'bottom-right' },
@@ -115,7 +115,7 @@ async function bulkDownload() {
             payload.watermark           = true;
             payload.watermark_text_type = wmTextType.value;
             payload.watermark_position  = wmPosition.value;
-            payload.watermark_opacity   = wmOpacity.value;
+            payload.watermark_opacity   = parseInt(String(wmOpacity.value), 10);
             if (wmTextType.value === 'custom') {
                 payload.watermark_text = wmCustomText.value;
             }

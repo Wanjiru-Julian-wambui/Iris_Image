@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Str;
 
 class AlbumStoreRequest extends FormRequest
 {
@@ -28,7 +27,6 @@ class AlbumStoreRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'slug'      => Str::slug($this->name) . '-' . Str::random(4),
             'is_public' => $this->boolean('is_public', false),
         ]);
     }
