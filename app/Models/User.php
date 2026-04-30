@@ -21,9 +21,14 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar',
+        'username',
+        'bio',
+        'website',
+        'profile_public',
         'plan_id',
         'is_admin',
         'storage_used',
+    
     ];
 
     protected $hidden = [
@@ -37,6 +42,7 @@ class User extends Authenticatable
         'storage_used_human',
         'storage_percent',
         'avatar_url',
+        'profile_url',
     ];
 
     protected function casts(): array
@@ -47,6 +53,7 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
             'is_admin'                => 'boolean',
             'storage_used'            => 'integer',
+            'profile_public'          => 'boolean',
         ];
     }
 
@@ -127,6 +134,25 @@ class User extends Authenticatable
             . '&background=7B2FFF&color=fff&bold=true';
     }
 
+    public function getProfileUrlAttribute(): ?string
+    {
+        if ($this->username) {
+            return route('profile.public', $this->username);
+        }
+        return null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeWherePublicProfile($query)
+    {
+        return $query->where('profile_public', true)->whereNotNull('username');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helpers
@@ -152,5 +178,13 @@ class User extends Authenticatable
     public function hasStorageSpace(int $bytes): bool
     {
         return ($this->storage_used + $bytes) <= $this->storageLimit();
+    }
+
+    public function publicImages()
+    {
+        return $this->images()
+            ->where('is_private', false)
+            ->where('published', true)
+            ->orderBy('created_at', 'desc');
     }
 }

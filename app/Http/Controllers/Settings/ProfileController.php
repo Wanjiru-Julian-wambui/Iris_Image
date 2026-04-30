@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
@@ -32,7 +33,9 @@ class ProfileController extends Controller
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $user->fill($request->safe()->except('avatar'));
+        $validated = $request->safe()->except('avatar');
+
+        $user->fill($validated);
 
         if ($request->hasFile('avatar')) {
             if ($user->avatar) {

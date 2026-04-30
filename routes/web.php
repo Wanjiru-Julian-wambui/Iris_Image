@@ -16,6 +16,7 @@ use App\Http\Controllers\TagController;
 use App\Http\Controllers\ImagePollController;
 use App\Http\Controllers\ImageReactionController;
 use App\Http\Controllers\ImageVersionController;
+use App\Http\Controllers\Profile\PublicProfileController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -31,6 +32,10 @@ Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('public.i
 Route::post('/i/{image}/react', [ImageReactionController::class, 'store'])->name('images.react');
 Route::get('/poll/{token}', [ImagePollController::class, 'show'])->name('polls.show');
 Route::post('/poll/{token}/vote', [ImagePollController::class, 'vote'])->name('polls.vote');
+
+// Public profile
+Route::get('/@{username}', [PublicProfileController::class, 'show'])
+    ->name('profile.public');
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -137,6 +142,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::post('/images/bulk-download', [ImageController::class, 'bulkDownload'])->name('images.bulk-download');
+
 });
 
 require __DIR__.'/settings.php';

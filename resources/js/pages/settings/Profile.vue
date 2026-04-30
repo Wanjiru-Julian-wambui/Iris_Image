@@ -8,6 +8,7 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { edit } from '@/routes/profile';
@@ -28,7 +29,6 @@ const breadcrumbItems: BreadcrumbItem[] = [
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
-// Local preview overrides avatar_url until the page reloads after save
 const avatarPreview = ref<string | null>(null);
 
 function onAvatarChange(event: Event) {
@@ -49,7 +49,7 @@ function onAvatarChange(event: Event) {
                 <Heading
                     variant="small"
                     title="Profile information"
-                    description="Update your name, email address, and avatar"
+                    description="Update your name, email address, avatar, and public profile"
                 />
 
                 <Form
@@ -111,6 +111,26 @@ function onAvatarChange(event: Event) {
                         <InputError class="mt-2" :message="errors.name" />
                     </div>
 
+                    <!-- Username -->
+                    <div class="grid gap-2">
+                        <Label for="username">Username</Label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                            <Input
+                                id="username"
+                                name="username"
+                                class="mt-1 block w-full pl-7"
+                                :default-value="user.username"
+                                autocomplete="username"
+                                placeholder="username"
+                            />
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                            Your public profile will be available at /@username
+                        </p>
+                        <InputError class="mt-2" :message="errors.username" />
+                    </div>
+
                     <!-- Email -->
                     <div class="grid gap-2">
                         <Label for="email">Email address</Label>
@@ -125,6 +145,50 @@ function onAvatarChange(event: Event) {
                             placeholder="Email address"
                         />
                         <InputError class="mt-2" :message="errors.email" />
+                    </div>
+
+                    <!-- Bio -->
+                    <div class="grid gap-2">
+                        <Label for="bio">Bio</Label>
+                        <textarea
+                            id="bio"
+                            name="bio"
+                            rows="3"
+                            class="mt-1 block w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                            :default-value="user.bio"
+                            placeholder="Tell visitors a little about yourself..."
+                        ></textarea>
+                        <InputError class="mt-2" :message="errors.bio" />
+                    </div>
+
+                    <!-- Website -->
+                    <div class="grid gap-2">
+                        <Label for="website">Website</Label>
+                        <Input
+                            id="website"
+                            type="url"
+                            name="website"
+                            class="mt-1 block w-full"
+                            :default-value="user.website"
+                            placeholder="https://your-website.com"
+                        />
+                        <InputError class="mt-2" :message="errors.website" />
+                    </div>
+
+                    <!-- Public Profile Toggle -->
+                    <div class="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
+                        <div class="space-y-0.5">
+                            <Label for="profile_public" class="text-sm font-medium">Public profile</Label>
+                            <p class="text-xs text-muted-foreground">
+                                Allow anyone to view your profile and published images
+                            </p>
+                        </div>
+                        <Switch
+                            id="profile_public"
+                            name="profile_public"
+                            :default-checked="user.profile_public"
+                            value="1"
+                        />
                     </div>
 
                     <!-- Email verification notice -->
