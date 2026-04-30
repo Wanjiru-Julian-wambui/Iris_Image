@@ -53,6 +53,16 @@ const chartColors = {
     emerald: '#34d399',
     rose: '#fb7185',
 };
+
+const tickStyle = { fill: '#94a3b8', fontSize: 11 };
+const axisLineStyle = { stroke: 'rgba(255,255,255,0.1)' };
+const tooltipStyle = {
+    backgroundColor: '#1e1e2e',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '12px',
+    fontSize: '12px',
+    color: '#e2e8f0',
+};
 </script>
 
 <template>
@@ -140,30 +150,24 @@ const chartColors = {
                                 <XAxis
                                     dataKey="date"
                                     :tickFormatter="formatDate"
-                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                                    :tick="tickStyle"
+                                    :axisLine="axisLineStyle"
                                 />
                                 <YAxis
-                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                                    allowDecimals={false}
+                                    :tick="tickStyle"
+                                    :axisLine="axisLineStyle"
+                                    :allowDecimals="false"
                                 />
                                 <Tooltip
-                                    :contentStyle="{
-                                        backgroundColor: '#1e1e2e',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '12px',
-                                        fontSize: '12px',
-                                        color: '#e2e8f0'
-                                    }"
+                                    :contentStyle="tooltipStyle"
                                     :formatter="(value: number) => [`${value} images`, 'Uploads']"
                                     :labelFormatter="(label: string) => formatDate(label)"
                                 />
                                 <Bar
                                     dataKey="count"
                                     :fill="chartColors.violet"
-                                    radius={[4, 4, 0, 0]}
-                                    maxBarSize={40}
+                                    :radius="[4, 4, 0, 0]"
+                                    :maxBarSize="40"
                                 />
                             </BarChart>
                         </ResponsiveContainer>
@@ -184,30 +188,24 @@ const chartColors = {
                             <AreaChart :data="storageTrend" :margin="{ top: 5, right: 5, left: -20, bottom: 5 }">
                                 <defs>
                                     <linearGradient id="storageGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" :stopColor="chartColors.cyan" stopOpacity={0.3} />
-                                        <stop offset="95%" :stopColor="chartColors.cyan" stopOpacity={0} />
+                                        <stop offset="5%" :stopColor="chartColors.cyan" :stopOpacity="0.3" />
+                                        <stop offset="95%" :stopColor="chartColors.cyan" :stopOpacity="0" />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                                 <XAxis
                                     dataKey="date"
                                     :tickFormatter="formatDate"
-                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                                    :tick="tickStyle"
+                                    :axisLine="axisLineStyle"
                                 />
                                 <YAxis
-                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                                    :tick="tickStyle"
+                                    :axisLine="axisLineStyle"
                                     :tickFormatter="(value: number) => formatBytes(value)"
                                 />
                                 <Tooltip
-                                    :contentStyle="{
-                                        backgroundColor: '#1e1e2e',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '12px',
-                                        fontSize: '12px',
-                                        color: '#e2e8f0'
-                                    }"
+                                    :contentStyle="tooltipStyle"
                                     :formatter="(value: number) => [formatBytes(value), 'Storage used']"
                                     :labelFormatter="(label: string) => formatDate(label)"
                                 />
@@ -215,7 +213,7 @@ const chartColors = {
                                     type="monotone"
                                     dataKey="bytes"
                                     :stroke="chartColors.cyan"
-                                    strokeWidth={2}
+                                    :strokeWidth="2"
                                     fill="url(#storageGradient)"
                                 />
                             </AreaChart>
@@ -239,22 +237,16 @@ const chartColors = {
                                 <XAxis
                                     dataKey="date"
                                     :tickFormatter="formatDate"
-                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                                    :tick="tickStyle"
+                                    :axisLine="axisLineStyle"
                                 />
                                 <YAxis
-                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                                    allowDecimals={false}
+                                    :tick="tickStyle"
+                                    :axisLine="axisLineStyle"
+                                    :allowDecimals="false"
                                 />
                                 <Tooltip
-                                    :contentStyle="{
-                                        backgroundColor: '#1e1e2e',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: '12px',
-                                        fontSize: '12px',
-                                        color: '#e2e8f0'
-                                    }"
+                                    :contentStyle="tooltipStyle"
                                     :formatter="(value: number) => [`${value} views`, 'Link views']"
                                     :labelFormatter="(label: string) => formatDate(label)"
                                 />
@@ -262,9 +254,9 @@ const chartColors = {
                                     type="monotone"
                                     dataKey="views"
                                     :stroke="chartColors.emerald"
-                                    strokeWidth={2}
-                                    dot={{ fill: chartColors.emerald, r: 3 }}
-                                    activeDot={{ r: 5, fill: chartColors.emerald }}
+                                    :strokeWidth="2"
+                                    :dot="{ fill: chartColors.emerald, r: 3 }"
+                                    :activeDot="{ r: 5, fill: chartColors.emerald }"
                                 />
                             </LineChart>
                         </ResponsiveContainer>
