@@ -78,7 +78,7 @@ class DashboardController extends Controller
             'total_views'     => SharedLink::where('created_by', $user->id)->sum('view_count') ?? 0,
             'storage_used'    => $user->storage_used_human,
             'storage_percent' => $user->storage_percent,
-            'storage_limit'   => $user->storage_limit ?? null,
+            'storage_limit'   => $user->storageLimit(),
         ];
 
         // ── Recent images ──
@@ -95,7 +95,7 @@ class DashboardController extends Controller
             'recentImages'  => ['data' => ImageResource::collection($recentImages)->resolve()],
             'user'          => [
                 'name'          => $user->name,
-                'storage_limit' => $user->storage_limit ?? null,
+                'storage_limit' => $user->storageLimit(),
             ],
         ]);
     }

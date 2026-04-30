@@ -229,8 +229,15 @@ class ImageController extends Controller
             'watermark'              => ['sometimes', 'boolean'],
             'watermark_text_type'    => ['sometimes', 'string', 'in:username,site_name,custom'],
             'watermark_text'         => ['required_if:watermark_text_type,custom', 'nullable', 'string', 'max:100'],
+            'watermark_mode'         => ['sometimes', 'string', 'in:single,tiled'],
             'watermark_position'     => ['sometimes', 'string', 'in:bottom-right,bottom-left,top-right,top-left,center'],
             'watermark_opacity'      => ['sometimes', 'integer', 'min:10', 'max:100'],
+            'watermark_font'         => ['sometimes', 'string', 'in:sans,sans-bold,serif,serif-bold,mono,oblique'],
+            'watermark_size'         => ['sometimes', 'integer', 'min:8', 'max:120'],
+            'watermark_angle'        => ['sometimes', 'integer', 'min:-90', 'max:90'],
+            'watermark_density'      => ['sometimes', 'integer', 'min:1', 'max:6'],
+            'watermark_color'        => ['sometimes', 'string', 'in:white,black,gray'],
+            'watermark_symbol'       => ['sometimes', 'nullable', 'string', 'max:5'],
         ]);
 
         $images = $request->user()
@@ -248,8 +255,15 @@ class ImageController extends Controller
             $watermarkOptions = [
                 'enabled'  => true,
                 'text'     => $this->resolveWatermarkText($request),
+                'mode'     => $request->input('watermark_mode',     'single'),
                 'position' => $request->input('watermark_position', 'bottom-right'),
                 'opacity'  => (int) $request->input('watermark_opacity', 60),
+                'font'     => $request->input('watermark_font',     'sans-bold'),
+                'size'     => (int) $request->input('watermark_size', 24),
+                'angle'    => (int) $request->input('watermark_angle', -30),
+                'density'  => (int) $request->input('watermark_density', 3),
+                'color'    => $request->input('watermark_color',    'white'),
+                'symbol'   => $request->input('watermark_symbol',   ''),
             ];
         }
 
@@ -297,10 +311,14 @@ class ImageController extends Controller
 
     private function resolveWatermarkText(Request $request): string
     {
-        return match ($request->input('watermark_text_type', 'site_name')) {
-            'username'  => $request->user()->name,
-            'custom'    => $request->input('watermark_text', config('app.name')),
-            default     => config('app.name'),
+        $base = match ($request->input('watermark_text_type', 'site_name')) {
+            'username' => $request->user()->name,
+            'custom'   => $request->input('watermark_text', config('app.name')),
+            default    => config('app.name'),
         };
+
+        $symbol = trim($request->input('watermark_symbol', ''));
+
+        return $symbol ? "{$symbol} {$base}" : $base;
     }
 }

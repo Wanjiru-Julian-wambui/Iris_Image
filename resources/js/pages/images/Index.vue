@@ -22,9 +22,7 @@ const props = defineProps<{
         meta: { current_page: number; last_page: number; total: number };
         links: { next: string | null; prev: string | null };
     };
-    filters?: {
-        search?: string;
-    };
+    filters?: { search?: string };
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -32,6 +30,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Images',    href: '/images'    },
 ];
 
+// ─── Delete ──────────────────────────────────────────────────────────────────
 const confirmDelete = ref<App.ImageResource | null>(null);
 const deleting      = ref(false);
 
@@ -46,6 +45,7 @@ function deleteImage() {
     });
 }
 
+// ─── Selection ───────────────────────────────────────────────────────────────
 const selected     = ref<Set<number>>(new Set());
 const selectMode   = ref(false);
 const bulkDeleting = ref(false);
@@ -71,23 +71,65 @@ function toggleAll() {
     selected.value = allSelected.value ? new Set() : new Set(props.images.data.map(i => i.id));
 }
 
-// ─── Bulk Download + Watermark Modal ─────────────────────────────────────────
-const showDownloadModal  = ref(false);
-const downloading        = ref(false);
-const useWatermark       = ref(false);
-const wmTextType         = ref<'username' | 'site_name' | 'custom'>('site_name');
-const wmCustomText       = ref('');
-const wmPosition         = ref('bottom-right');
-const wmOpacity          = ref<number>(60);
-
-function closeDownloadModal() {
-    showDownloadModal.value = false;
-    useWatermark.value      = false;
-    wmCustomText.value      = '';
-    wmTextType.value        = 'site_name';
-    wmPosition.value        = 'bottom-right';
-    wmOpacity.value         = 60;
+/**
+ * Double-click on any image card:
+ * - If not in select mode → enters select mode and selects that image.
+ * - If already in select mode → toggles that image's selection.
+ */
+function handleDoubleClick(id: number) {
+    if (!selectMode.value) {
+        selectMode.value = true;
+    }
+    toggleSelect(id);
 }
+
+// ─── Bulk Download + Watermark Modal ─────────────────────────────────────────
+const showDownloadModal = ref(false);
+const downloading       = ref(false);
+const useWatermark      = ref(false);
+
+// watermark text
+const wmTextType   = ref<'username' | 'site_name' | 'custom'>('site_name');
+const wmCustomText = ref('');
+
+// watermark symbol prefix (© ™ ® or none)
+const wmSymbol = ref<'none' | 'copyright' | 'trademark' | 'registered'>('none');
+
+// layout
+const wmMode     = ref<'single' | 'tiled'>('single');
+const wmPosition = ref('bottom-right');
+const wmDensity  = ref<number>(3);
+const wmAngle    = ref<number>(-30);
+
+// typography
+const wmFont  = ref('sans-bold');
+const wmSize  = ref<number>(24);
+const wmColor = ref('white');
+
+// visibility
+const wmOpacity = ref<number>(60);
+
+const symbolOptions = [
+    { label: 'None',       value: 'none',       char: ''  },
+    { label: '©',          value: 'copyright',  char: '©' },
+    { label: '™',          value: 'trademark',  char: '™' },
+    { label: '®',          value: 'registered', char: '®' },
+];
+
+const fontOptions = [
+    { label: 'Sans',        value: 'sans'       },
+    { label: 'Sans Bold',   value: 'sans-bold'  },
+    { label: 'Serif',       value: 'serif'      },
+    { label: 'Serif Bold',  value: 'serif-bold' },
+    { label: 'Mono',        value: 'mono'       },
+    { label: 'Italic',      value: 'oblique'    },
+];
+
+const colorOptions = [
+    { label: 'White', value: 'white' },
+    { label: 'Black', value: 'black' },
+    { label: 'Gray',  value: 'gray'  },
+];
 
 const positionOptions = [
     { label: 'Bottom right', value: 'bottom-right' },
@@ -98,15 +140,46 @@ const positionOptions = [
 ];
 
 const textTypeOptions = [
-    { label: 'Site name',     value: 'site_name' },
-    { label: 'My username',   value: 'username'  },
-    { label: 'Custom text',   value: 'custom'    },
+    { label: 'Site name',   value: 'site_name' },
+    { label: 'My username', value: 'username'  },
+    { label: 'Custom text', value: 'custom'    },
 ];
+
+// Live preview of what the watermark text will look like
+const wmPreview = computed(() => {
+    const sym  = symbolOptions.find(s => s.value === wmSymbol.value)?.char ?? '';
+    const base = wmTextType.value === 'custom'
+        ? (wmCustomText.value || 'Your text here')
+        : wmTextType.value === 'username' ? 'username' : 'Site Name';
+    return sym ? `${sym} ${base}` : base;
+});
+
+function closeDownloadModal() {
+    showDownloadModal.value = false;
+    useWatermark.value      = false;
+    wmTextType.value        = 'site_name';
+    wmCustomText.value      = '';
+    wmSymbol.value          = 'none';
+    wmMode.value            = 'single';
+    wmPosition.value        = 'bottom-right';
+    wmDensity.value         = 3;
+    wmAngle.value           = -30;
+    wmFont.value            = 'sans-bold';
+    wmSize.value            = 24;
+    wmColor.value           = 'white';
+    wmOpacity.value         = 60;
+}
 
 function openDownloadModal() {
     if (!selectedCount.value) return;
     showDownloadModal.value = true;
 }
+
+// Whether the Download button should be disabled
+const downloadDisabled = computed(() =>
+    downloading.value ||
+    (useWatermark.value && wmTextType.value === 'custom' && !wmCustomText.value.trim())
+);
 
 async function bulkDownload() {
     if (!selectedCount.value) return;
@@ -120,19 +193,28 @@ async function bulkDownload() {
         };
 
         if (useWatermark.value) {
-            payload.watermark           = true;
-            payload.watermark_text_type = wmTextType.value;
-            payload.watermark_position  = wmPosition.value;
-            payload.watermark_opacity   = parseInt(String(wmOpacity.value), 10);
+            // Build the final text including the symbol prefix
+            const sym  = symbolOptions.find(s => s.value === wmSymbol.value)?.char ?? '';
+            payload.watermark            = true;
+            payload.watermark_text_type  = wmTextType.value;
+            payload.watermark_symbol     = sym;          // server prepends this
+            payload.watermark_mode       = wmMode.value;
+            payload.watermark_position   = wmPosition.value;
+            payload.watermark_opacity    = parseInt(String(wmOpacity.value), 10);
+            payload.watermark_font       = wmFont.value;
+            payload.watermark_size       = parseInt(String(wmSize.value), 10);
+            payload.watermark_angle      = parseInt(String(wmAngle.value), 10);
+            payload.watermark_density    = parseInt(String(wmDensity.value), 10);
+            payload.watermark_color      = wmColor.value;
             if (wmTextType.value === 'custom') {
                 payload.watermark_text = wmCustomText.value;
             }
         }
 
         const res = await fetch('/images/bulk-download', {
-            method: 'POST',
+            method:  'POST',
             headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-            body: JSON.stringify(payload),
+            body:    JSON.stringify(payload),
         });
 
         if (!res.ok) throw new Error('Download failed');
@@ -150,12 +232,13 @@ async function bulkDownload() {
         selected.value = new Set();
         closeDownloadModal();
     } catch {
-        alert('Failed to download images.');
+        alert('Failed to download images. Please try again.');
     } finally {
         downloading.value = false;
     }
 }
 
+// ─── Bulk Delete ─────────────────────────────────────────────────────────────
 function bulkDelete() {
     if (!selectedCount.value) return;
     if (!confirm(`Delete ${selectedCount.value} image(s)? This cannot be undone.`)) return;
@@ -190,23 +273,12 @@ const batchTagInput     = ref('');
 const batchTagAction    = ref<'add' | 'remove'>('add');
 const batchTagging      = ref(false);
 
-function openBatchTag() {
-    showBatchTagPanel.value = true;
-}
-
-function closeBatchTag() {
-    showBatchTagPanel.value = false;
-    batchTagInput.value = '';
-}
+function openBatchTag() { showBatchTagPanel.value = true; }
+function closeBatchTag() { showBatchTagPanel.value = false; batchTagInput.value = ''; }
 
 function applyBatchTags() {
-    const tags = batchTagInput.value
-        .split(',')
-        .map(t => t.trim())
-        .filter(t => t.length > 0);
-
+    const tags = batchTagInput.value.split(',').map(t => t.trim()).filter(Boolean);
     if (!tags.length || !selectedCount.value) return;
-
     batchTagging.value = true;
     router.post('/images/batch-tag', {
         ids: Array.from(selected.value),
@@ -224,6 +296,7 @@ function applyBatchTags() {
     });
 }
 
+// ─── Drag-to-reorder ─────────────────────────────────────────────────────────
 const gridRef    = ref<HTMLElement | null>(null);
 const imagesList = ref([...props.images.data]);
 
@@ -236,7 +309,7 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                 preserveScroll: true,
                 preserveState: true,
             });
-        }
+        },
     }
 );
 </script>
@@ -245,13 +318,16 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head title="Images" />
         <div class="px-4 py-6 md:px-8">
+
             <!-- Header -->
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">Images</h1>
-                    <p class="text-sm text-muted-foreground mt-1">{{ images.meta.total }} image{{ images.meta.total !== 1 ? 's' : '' }} total</p>
+                    <p class="text-sm text-muted-foreground mt-1">
+                        {{ images.meta.total }} image{{ images.meta.total !== 1 ? 's' : '' }} total
+                    </p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap justify-end">
                     <Button v-if="images.data.length > 0" variant="outline" size="sm"
                             :class="selectMode ? 'border-violet-500 text-violet-500' : ''"
                             @click="toggleSelectMode">
@@ -262,52 +338,52 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                         <Button variant="outline" size="sm" @click="toggleAll">
                             {{ allSelected ? 'Deselect all' : 'Select all' }}
                         </Button>
-                        <Button v-if="selectedCount > 0" variant="outline" size="sm" class="gap-2 text-amber-400 border-amber-400/30 hover:bg-amber-500/10"
+                        <Button v-if="selectedCount > 0" variant="outline" size="sm"
+                                class="gap-2 text-amber-400 border-amber-400/30 hover:bg-amber-500/10"
                                 @click="openBatchTag">
-                            <Tag class="h-4 w-4" />
-                            Tag {{ selectedCount }}
+                            <Tag class="h-4 w-4" /> Tag {{ selectedCount }}
                         </Button>
-                        <Button v-if="selectedCount > 0" variant="outline" size="sm" class="gap-2 text-rose-400 border-rose-400/30 hover:bg-rose-500/10"
+                        <Button v-if="selectedCount > 0" variant="outline" size="sm"
+                                class="gap-2 text-rose-400 border-rose-400/30 hover:bg-rose-500/10"
                                 :disabled="bulkDeleting" @click="bulkDelete">
                             <Trash2 class="h-4 w-4" />
                             {{ bulkDeleting ? 'Deleting...' : `Delete ${selectedCount}` }}
                         </Button>
-                        <Button v-if="selectedCount > 0" size="sm" class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
+                        <Button v-if="selectedCount > 0" size="sm"
+                                class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
                                 @click="openDownloadModal">
-                            <Download class="h-4 w-4" />
-                            Download {{ selectedCount }}
+                            <Download class="h-4 w-4" /> Download {{ selectedCount }}
                         </Button>
                     </template>
 
                     <Link href="/images/create">
                         <Button class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90">
-                            <Plus class="h-4 w-4" />
-                            Upload
+                            <Plus class="h-4 w-4" /> Upload
                         </Button>
                     </Link>
                 </div>
             </div>
 
+            <!-- Hint bar: shown when not in select mode and there are images -->
+            <p v-if="!selectMode && images.data.length > 0" class="text-xs text-muted-foreground mb-4">
+                Tip: <kbd class="px-1 py-0.5 rounded border border-border bg-muted text-[10px]">double-click</kbd> any image to enter select mode
+            </p>
+
             <!-- Search bar -->
             <div class="relative mb-6">
                 <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                    ref="searchInput"
-                    v-model="searchQuery"
+                <Input ref="searchInput" v-model="searchQuery"
                     placeholder="Search by name, caption, alt text, or tag..."
-                    class="pl-10 w-full max-w-md"
-                />
-                <button
-                    v-if="searchQuery"
-                    @click="searchQuery = ''"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
+                    class="pl-10 w-full max-w-md" />
+                <button v-if="searchQuery" @click="searchQuery = ''"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     <X class="h-4 w-4" />
                 </button>
             </div>
 
             <!-- Empty state -->
-            <div v-if="images.data.length === 0" class="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-24 text-center">
+            <div v-if="images.data.length === 0"
+                 class="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-24 text-center">
                 <div class="flex size-16 items-center justify-center rounded-full bg-muted mb-4">
                     <ImageIcon class="h-8 w-8 text-muted-foreground" />
                 </div>
@@ -319,14 +395,14 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                 </p>
                 <Link v-if="!searchQuery" href="/images/create">
                     <Button class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90">
-                        <Upload class="h-4 w-4" />
-                        Upload images
+                        <Upload class="h-4 w-4" /> Upload images
                     </Button>
                 </Link>
             </div>
 
             <!-- Image grid -->
-            <div v-else ref="gridRef" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <div v-else ref="gridRef"
+                 class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 <div
                     v-for="(image, index) in imagesList"
                     :key="image.id"
@@ -335,45 +411,55 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                     @dragover.prevent="!selectMode && handleDragOver($event, index)"
                     @drop="!selectMode && handleDrop($event, index)"
                     @dragend="!selectMode && handleDragEnd"
+                    @dblclick.prevent="handleDoubleClick(image.id)"
+                    @click="selectMode ? toggleSelect(image.id) : null"
                     class="group relative rounded-xl overflow-hidden border border-border bg-muted aspect-square"
                     :class="{
-                        'cursor-move': !selectMode,
+                        'cursor-move':  !selectMode,
                         'cursor-pointer': selectMode,
                         'ring-2 ring-violet-500 opacity-50': draggedIndex === index,
                         'ring-2 ring-cyan-400': dragOverIndex === index && dragOverIndex !== draggedIndex,
                         'ring-2 ring-[#7B2FFF] border-[#7B2FFF]': selectMode && selected.has(image.id),
                     }"
-                    @click="selectMode ? toggleSelect(image.id) : null"
                 >
+                    <!-- Image -->
                     <Link v-if="!selectMode" :href="`/images/${image.id}`" class="block w-full h-full">
-                        <img :src="image.thumbnail_url" :alt="image.name" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                        <img :src="image.thumbnail_url" :alt="image.name"
+                             class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                     </Link>
-                    <img v-else :src="image.thumbnail_url" :alt="image.name" class="w-full h-full object-cover" />
+                    <img v-else :src="image.thumbnail_url" :alt="image.name"
+                         class="w-full h-full object-cover" />
 
                     <!-- Tags overlay -->
-                    <div v-if="!selectMode && image.tags?.length" class="absolute top-2 left-2 right-2 flex flex-wrap gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Badge v-for="tag in image.tags.slice(0, 3)" :key="tag.id" variant="secondary" class="text-[10px] px-1.5 py-0 h-4 bg-black/60 text-white border-0">
+                    <div v-if="!selectMode && image.tags?.length"
+                         class="absolute top-2 left-2 right-2 flex flex-wrap gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Badge v-for="tag in image.tags.slice(0, 3)" :key="tag.id"
+                               variant="secondary" class="text-[10px] px-1.5 py-0 h-4 bg-black/60 text-white border-0">
                             {{ tag.name }}
                         </Badge>
-                        <Badge v-if="image.tags.length > 3" variant="secondary" class="text-[10px] px-1.5 py-0 h-4 bg-black/60 text-white border-0">
+                        <Badge v-if="image.tags.length > 3"
+                               variant="secondary" class="text-[10px] px-1.5 py-0 h-4 bg-black/60 text-white border-0">
                             +{{ image.tags.length - 3 }}
                         </Badge>
                     </div>
 
-                    <!-- Selection checkbox -->
-                    <div v-if="selectMode" class="absolute top-2 left-2 flex size-5 items-center justify-center rounded-full border-2 transition-colors"
+                    <!-- Selection indicator -->
+                    <div v-if="selectMode"
+                         class="absolute top-2 left-2 flex size-5 items-center justify-center rounded-full border-2 transition-colors"
                          :class="selected.has(image.id) ? 'border-[#7B2FFF] bg-[#7B2FFF]' : 'border-white/80 bg-black/30'">
                         <svg v-if="selected.has(image.id)" class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
                             <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
+                    <div v-if="selectMode && selected.has(image.id)"
+                         class="absolute inset-0 bg-[#7B2FFF]/15 pointer-events-none" />
 
-                    <div v-if="selectMode && selected.has(image.id)" class="absolute inset-0 bg-[#7B2FFF]/15 pointer-events-none" />
-
-                    <!-- Hover actions -->
-                    <div v-if="!selectMode" class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-3">
+                    <!-- Double-click hint (non-select mode only, on hover) -->
+                    <div v-if="!selectMode"
+                         class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-3">
                         <div class="flex justify-end">
-                            <button @click.prevent.stop="openDelete(image)" class="flex size-7 items-center justify-center rounded-full bg-red-500/90 hover:bg-red-500 text-white transition-colors">
+                            <button @click.prevent.stop="openDelete(image)"
+                                    class="flex size-7 items-center justify-center rounded-full bg-red-500/90 hover:bg-red-500 text-white transition-colors">
                                 <Trash2 class="h-3.5 w-3.5" />
                             </button>
                         </div>
@@ -386,7 +472,6 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                     <div v-if="image.is_private && !selectMode" class="absolute top-2 right-2">
                         <Badge variant="secondary" class="text-xs px-1.5 py-0">Private</Badge>
                     </div>
-
                     <div v-if="!selectMode" class="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <GripVertical class="h-4 w-4 text-white/60" />
                     </div>
@@ -398,30 +483,37 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                 <Link v-if="images.links.prev" :href="images.links.prev">
                     <Button variant="outline" size="sm">Previous</Button>
                 </Link>
-                <span class="flex items-center text-sm text-muted-foreground px-3">Page {{ images.meta.current_page }} of {{ images.meta.last_page }}</span>
+                <span class="flex items-center text-sm text-muted-foreground px-3">
+                    Page {{ images.meta.current_page }} of {{ images.meta.last_page }}
+                </span>
                 <Link v-if="images.links.next" :href="images.links.next">
                     <Button variant="outline" size="sm">Next</Button>
                 </Link>
             </div>
         </div>
 
-        <!-- Delete Dialog -->
+        <!-- ── Delete Dialog ───────────────────────────────────────────────── -->
         <Dialog :open="!!confirmDelete" @update:open="cancelDelete">
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Delete image</DialogTitle>
-                    <DialogDescription>Are you sure you want to delete <strong>{{ confirmDelete?.name }}</strong>? This action cannot be undone.</DialogDescription>
+                    <DialogDescription>
+                        Are you sure you want to delete <strong>{{ confirmDelete?.name }}</strong>?
+                        This action cannot be undone.
+                    </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
                     <Button variant="outline" @click="cancelDelete">Cancel</Button>
-                    <Button variant="destructive" :disabled="deleting" @click="deleteImage">{{ deleting ? 'Deleting...' : 'Delete' }}</Button>
+                    <Button variant="destructive" :disabled="deleting" @click="deleteImage">
+                        {{ deleting ? 'Deleting...' : 'Delete' }}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
 
-        <!-- Bulk Download + Watermark Modal -->
+        <!-- ── Bulk Download + Watermark Modal ────────────────────────────── -->
         <Dialog :open="showDownloadModal" @update:open="(val) => { if (!val) closeDownloadModal(); }">
-            <DialogContent class="sm:max-w-md">
+            <DialogContent class="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Download {{ selectedCount }} image{{ selectedCount !== 1 ? 's' : '' }}</DialogTitle>
                     <DialogDescription>
@@ -430,6 +522,7 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                 </DialogHeader>
 
                 <div class="space-y-4 py-2">
+
                     <!-- Watermark toggle -->
                     <div class="flex items-center justify-between">
                         <div>
@@ -440,48 +533,114 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                             type="button"
                             role="switch"
                             :aria-checked="useWatermark"
-                            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors"
                             :class="useWatermark ? 'bg-violet-500' : 'bg-input'"
                             @click.stop="useWatermark = !useWatermark"
                         >
-                            <span
-                                class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform"
-                                :class="useWatermark ? 'translate-x-5' : 'translate-x-0'"
-                            />
+                            <span class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform"
+                                  :class="useWatermark ? 'translate-x-5' : 'translate-x-0'" />
                         </button>
                     </div>
 
-                    <!-- Watermark options — v-show keeps DOM stable, no focus-trap re-trigger -->
-                    <div v-show="useWatermark" class="space-y-3 pt-3 border-t border-border">
-                        <!-- Text type selector -->
+                    <!-- All watermark controls -->
+                    <div v-show="useWatermark" class="space-y-4 pt-3 border-t border-border">
+
+                        <!-- Live preview -->
+                        <div class="rounded-lg bg-muted/60 border border-border px-4 py-3 flex items-center justify-between">
+                            <span class="text-xs text-muted-foreground">Preview</span>
+                            <span class="text-sm font-semibold tracking-wide text-foreground/80 select-none">
+                                {{ wmPreview }}
+                            </span>
+                        </div>
+
+                        <!-- Style: Single vs Tiled -->
+                        <div class="space-y-1.5">
+                            <Label class="text-xs text-muted-foreground">Style</Label>
+                            <div class="flex rounded-lg border border-border overflow-hidden">
+                                <button type="button" @click.stop="wmMode = 'single'"
+                                    class="flex-1 px-3 py-1.5 text-xs font-medium transition-colors"
+                                    :class="wmMode === 'single' ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'">
+                                    Single
+                                </button>
+                                <button type="button" @click.stop="wmMode = 'tiled'"
+                                    class="flex-1 px-3 py-1.5 text-xs font-medium transition-colors"
+                                    :class="wmMode === 'tiled' ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'">
+                                    Tiled (repeat)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Symbol picker -->
+                        <div class="space-y-1.5">
+                            <Label class="text-xs text-muted-foreground">Symbol</Label>
+                            <div class="flex rounded-lg border border-border overflow-hidden">
+                                <button v-for="opt in symbolOptions" :key="opt.value"
+                                    type="button" @click.stop="wmSymbol = opt.value as any"
+                                    class="flex-1 py-1.5 text-xs font-medium transition-colors"
+                                    :class="wmSymbol === opt.value ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'">
+                                    {{ opt.label }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Text source -->
                         <div class="space-y-1.5">
                             <Label class="text-xs text-muted-foreground">Watermark text</Label>
                             <div class="flex rounded-lg border border-border overflow-hidden">
-                                <button
-                                    v-for="opt in textTypeOptions"
-                                    :key="opt.value"
-                                    type="button"
-                                    @click.stop="wmTextType = opt.value as any"
+                                <button v-for="opt in textTypeOptions" :key="opt.value"
+                                    type="button" @click.stop="wmTextType = opt.value as any"
                                     class="flex-1 px-2 py-1.5 text-xs font-medium transition-colors"
-                                    :class="wmTextType === opt.value ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'"
-                                >
+                                    :class="wmTextType === opt.value ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'">
                                     {{ opt.label }}
                                 </button>
                             </div>
                         </div>
 
                         <!-- Custom text input -->
-                        <div v-show="wmTextType === 'custom'" class="space-y-1">
-                            <Input
-                                v-model="wmCustomText"
-                                placeholder="e.g. © Your Name 2026"
-                                maxlength="60"
-                                class="text-sm"
-                            />
+                        <div v-show="wmTextType === 'custom'">
+                            <Input v-model="wmCustomText"
+                                   placeholder="e.g. Iris Photography Studio"
+                                   maxlength="60" class="text-sm" />
                         </div>
 
-                        <!-- Position -->
+                        <!-- Font + Color -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="space-y-1.5">
+                                <Label class="text-xs text-muted-foreground">Font</Label>
+                                <Select v-model="wmFont">
+                                    <SelectTrigger class="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="opt in fontOptions" :key="opt.value" :value="opt.value">
+                                            {{ opt.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <Label class="text-xs text-muted-foreground">Color</Label>
+                                <div class="flex rounded-lg border border-border overflow-hidden h-8">
+                                    <button v-for="opt in colorOptions" :key="opt.value"
+                                        type="button" @click.stop="wmColor = opt.value"
+                                        class="flex-1 text-xs font-medium transition-colors"
+                                        :class="wmColor === opt.value ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'">
+                                        {{ opt.label }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Font size -->
                         <div class="space-y-1.5">
+                            <div class="flex justify-between">
+                                <Label class="text-xs text-muted-foreground">Font size</Label>
+                                <span class="text-xs text-muted-foreground">{{ wmSize }}pt</span>
+                            </div>
+                            <input v-model="wmSize" type="range" min="8" max="80" step="2"
+                                   class="w-full accent-violet-500" />
+                        </div>
+
+                        <!-- Position (single mode only) -->
+                        <div v-show="wmMode === 'single'" class="space-y-1.5">
                             <Label class="text-xs text-muted-foreground">Position</Label>
                             <Select v-model="wmPosition">
                                 <SelectTrigger class="h-8 text-sm"><SelectValue /></SelectTrigger>
@@ -493,14 +652,36 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                             </Select>
                         </div>
 
+                        <!-- Density (tiled mode only) -->
+                        <div v-show="wmMode === 'tiled'" class="space-y-1.5">
+                            <div class="flex justify-between">
+                                <Label class="text-xs text-muted-foreground">Density</Label>
+                                <span class="text-xs text-muted-foreground">{{ wmDensity }} / 6</span>
+                            </div>
+                            <input v-model="wmDensity" type="range" min="1" max="6" step="1"
+                                   class="w-full accent-violet-500" />
+                        </div>
+
+                        <!-- Angle -->
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between">
+                                <Label class="text-xs text-muted-foreground">Angle</Label>
+                                <span class="text-xs text-muted-foreground">{{ wmAngle }}°</span>
+                            </div>
+                            <input v-model="wmAngle" type="range" min="-90" max="90" step="5"
+                                   class="w-full accent-violet-500" />
+                        </div>
+
                         <!-- Opacity -->
                         <div class="space-y-1.5">
                             <div class="flex justify-between">
                                 <Label class="text-xs text-muted-foreground">Opacity</Label>
                                 <span class="text-xs text-muted-foreground">{{ wmOpacity }}%</span>
                             </div>
-                            <input v-model="wmOpacity" type="range" min="10" max="100" step="5" class="w-full accent-violet-500" />
+                            <input v-model="wmOpacity" type="range" min="10" max="100" step="5"
+                                   class="w-full accent-violet-500" />
                         </div>
+
                     </div>
                 </div>
 
@@ -508,7 +689,7 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                     <Button variant="outline" @click="closeDownloadModal">Cancel</Button>
                     <Button
                         class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
-                        :disabled="downloading || (useWatermark && wmTextType === 'custom' && !wmCustomText.trim())"
+                        :disabled="downloadDisabled"
                         @click="bulkDownload"
                     >
                         <Droplets v-if="useWatermark" class="h-4 w-4" />
@@ -519,7 +700,7 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
             </DialogContent>
         </Dialog>
 
-        <!-- Batch Tag Slide-up Panel -->
+        <!-- ── Batch Tag Slide-up Panel ────────────────────────────────────── -->
         <Transition
             enter-active-class="transition-transform duration-300 ease-out"
             enter-from-class="translate-y-full"
@@ -528,7 +709,8 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
             leave-from-class="translate-y-0"
             leave-to-class="translate-y-full"
         >
-            <div v-if="showBatchTagPanel" class="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-2xl p-4 md:p-6">
+            <div v-if="showBatchTagPanel"
+                 class="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-2xl p-4 md:p-6">
                 <div class="max-w-3xl mx-auto space-y-4">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
@@ -539,39 +721,27 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                             <X class="h-5 w-5" />
                         </button>
                     </div>
-
                     <div class="flex flex-col sm:flex-row gap-3">
                         <div class="flex-1 space-y-1">
                             <label class="text-xs text-muted-foreground">Tags (comma-separated)</label>
-                            <Input
-                                v-model="batchTagInput"
-                                placeholder="e.g. nature, vacation, 2026"
-                                class="w-full"
-                                @keydown.enter.prevent="applyBatchTags"
-                            />
+                            <Input v-model="batchTagInput" placeholder="e.g. nature, vacation, 2026"
+                                   class="w-full" @keydown.enter.prevent="applyBatchTags" />
                         </div>
                         <div class="flex items-end gap-2">
                             <div class="flex rounded-lg border border-border overflow-hidden">
-                                <button
-                                    @click="batchTagAction = 'add'"
+                                <button @click="batchTagAction = 'add'"
                                     class="px-3 py-2 text-xs font-medium transition-colors"
-                                    :class="batchTagAction === 'add' ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80'"
-                                >
+                                    :class="batchTagAction === 'add' ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80'">
                                     Add
                                 </button>
-                                <button
-                                    @click="batchTagAction = 'remove'"
+                                <button @click="batchTagAction = 'remove'"
                                     class="px-3 py-2 text-xs font-medium transition-colors"
-                                    :class="batchTagAction === 'remove' ? 'bg-rose-500 text-white' : 'bg-muted hover:bg-muted/80'"
-                                >
+                                    :class="batchTagAction === 'remove' ? 'bg-rose-500 text-white' : 'bg-muted hover:bg-muted/80'">
                                     Remove
                                 </button>
                             </div>
-                            <Button
-                                class="bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
-                                :disabled="batchTagging || !batchTagInput.trim()"
-                                @click="applyBatchTags"
-                            >
+                            <Button class="bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
+                                    :disabled="batchTagging || !batchTagInput.trim()" @click="applyBatchTags">
                                 <Check v-if="batchTagging" class="h-4 w-4 animate-spin" />
                                 <Tag v-else class="h-4 w-4" />
                                 {{ batchTagging ? 'Applying...' : 'Apply' }}
