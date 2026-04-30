@@ -3,15 +3,21 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ref, onMounted, computed } from 'vue';
 import { Image, HardDrive, Link2, Eye, TrendingUp } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { Bar, Line } from 'vue-chartjs';
 import {
-    BarChart, Bar,
-    XAxis, YAxis,
-    CartesianGrid, Tooltip,
-    ResponsiveContainer,
-    LineChart, Line,
-    Area, AreaChart,
-} from 'recharts';
+    Chart as ChartJS,
+    CategoryScale, LinearScale,
+    BarElement, LineElement, PointElement,
+    Filler, Tooltip, Legend,
+    type ChartOptions,
+} from 'chart.js';
 import type { BreadcrumbItem } from '@/types';
+
+ChartJS.register(
+    CategoryScale, LinearScale,
+    BarElement, LineElement, PointElement,
+    Filler, Tooltip, Legend,
+);
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: '/dashboard' }];
 
@@ -51,7 +57,7 @@ function formatDate(dateStr: string): string {
 }
 
 const storageLimit = computed(() =>
-    props.stats.storage_limit  ? formatBytes(props.stats.storage_limit) :
+    props.stats.storage_limit ? formatBytes(props.stats.storage_limit) :
     props.user?.storage_limit  ? formatBytes(props.user.storage_limit)  : null
 );
 
@@ -124,23 +130,122 @@ const usedDash = computed(() => {
     return `${(pct * CIRCUM).toFixed(2)} ${CIRCUM.toFixed(2)}`;
 });
 
-// ── Chart shared styles ─────────────────────────────────────────────────────
+// ── Chart.js data & options ─────────────────────────────────────────────────
 
-const tickStyle     = { fill: '#94a3b8', fontSize: 11 };
-const axisLineStyle = { stroke: 'rgba(255,255,255,0.1)' };
-const tooltipStyle  = {
-    backgroundColor: '#1e1e2e',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '12px',
-    fontSize: '12px',
-    color: '#e2e8f0',
+const uploadsChartData = computed(() => ({
+    labels: props.uploadHistory.map(d => formatDate(d.date)),
+    datasets: [{
+        label: 'Uploads',
+        data: props.uploadHistory.map(d => d.count),
+        backgroundColor: '#8b5cf6',
+        borderRadius: 4,
+        maxBarThickness: 32,
+    }],
+}));
+
+const storageChartData = computed(() => ({
+    labels: props.storageTrend.map(d => formatDate(d.date)),
+    datasets: [{
+        label: 'Storage used',
+        data: props.storageTrend.map(d => d.bytes),
+        borderColor: '#22d3ee',
+        backgroundColor: 'rgba(34,211,238,0.12)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+    }],
+}));
+
+const linkViewsChartData = computed(() => ({
+    labels: props.linkViews.map(d => formatDate(d.date)),
+    datasets: [{
+        label: 'Link views',
+        data: props.linkViews.map(d => d.views),
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52,211,153,0.12)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+    }],
+}));
+
+const barOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            backgroundColor: '#1e1e2e',
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            titleColor: '#94a3b8',
+            bodyColor: '#e2e8f0',
+            cornerRadius: 8,
+        },
+    },
+    scales: {
+        x: {
+            ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 7 },
+            grid:  { display: false },
+        },
+        y: {
+            ticks: { color: '#94a3b8', font: { size: 10 }, precision: 0 },
+            grid:  { color: 'rgba(255,255,255,0.05)' },
+        },
+    },
 };
 
-const chartColors = {
-    violet:  '#8b5cf6',
-    cyan:    '#22d3ee',
-    emerald: '#34d399',
+const lineOptions: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            backgroundColor: '#1e1e2e',
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            titleColor: '#94a3b8',
+            bodyColor: '#e2e8f0',
+            cornerRadius: 8,
+        },
+    },
+    scales: {
+        x: {
+            ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 7 },
+            grid:  { display: false },
+        },
+        y: {
+            ticks: { color: '#94a3b8', font: { size: 10 } },
+            grid:  { color: 'rgba(255,255,255,0.05)' },
+        },
+    },
 };
+
+const storageLineOptions = computed<ChartOptions<'line'>>(() => ({
+    ...lineOptions,
+    plugins: {
+        ...lineOptions.plugins,
+        tooltip: {
+            ...lineOptions.plugins?.tooltip,
+            callbacks: {
+                label: (ctx) => formatBytes(ctx.parsed.y),
+            },
+        },
+    },
+    scales: {
+        x: lineOptions.scales?.x,
+        y: {
+            ticks: {
+                color: '#94a3b8',
+                font: { size: 10 },
+                callback: (val) => formatBytes(Number(val)),
+            },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+        },
+    },
+}));
 </script>
 
 <template>
@@ -191,7 +296,7 @@ const chartColors = {
                     :class="mounted ? 'card-in' : 'opacity-0'"
                     style="animation-delay: 0.12s"
                 >
-                    <div class="flex items-center gap-2 text-amber-400">
+                    <div class="flex items-center gap-2 text-cyan-400">
                         <HardDrive class="h-4 w-4" />
                         <span class="text-xs font-bold uppercase tracking-widest text-muted-foreground">Storage</span>
                     </div>
@@ -204,16 +309,18 @@ const chartColors = {
                             >
                                 <defs>
                                     <linearGradient :id="gradId" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stop-color="#f59e0b" />
-                                        <stop offset="100%" stop-color="#ef4444" />
+                                        <stop offset="0%" stop-color="#7B2FFF" />
+                                        <stop offset="100%" stop-color="#00C6FF" />
                                     </linearGradient>
                                 </defs>
+                                <!-- Track ring -->
                                 <circle
                                     :cx="SIZE / 2" :cy="SIZE / 2" :r="R"
                                     fill="none"
-                                    stroke="rgba(255,255,255,0.08)"
+                                    stroke="#e5e7eb"
                                     :stroke-width="STROKE"
                                 />
+                                <!-- Progress arc -->
                                 <circle
                                     :cx="SIZE / 2" :cy="SIZE / 2" :r="R"
                                     fill="none"
@@ -276,20 +383,8 @@ const chartColors = {
                         Uploads per day
                     </h3>
                     <p class="text-xs text-muted-foreground mb-4">Last 30 days</p>
-                    <div class="h-48 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart :data="uploadHistory" :margin="{ top: 4, right: 4, left: -24, bottom: 4 }">
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis dataKey="date" :tickFormatter="formatDate" :tick="tickStyle" :axisLine="axisLineStyle" />
-                                <YAxis :tick="tickStyle" :axisLine="axisLineStyle" :allowDecimals="false" />
-                                <Tooltip
-                                    :contentStyle="tooltipStyle"
-                                    :formatter="(value: number) => [`${value} images`, 'Uploads']"
-                                    :labelFormatter="(label: string) => formatDate(label)"
-                                />
-                                <Bar dataKey="count" :fill="chartColors.violet" :radius="[4, 4, 0, 0]" :maxBarSize="32" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div class="h-48">
+                        <Bar :data="uploadsChartData" :options="barOptions" />
                     </div>
                 </div>
 
@@ -304,30 +399,8 @@ const chartColors = {
                         Storage trend
                     </h3>
                     <p class="text-xs text-muted-foreground mb-4">Cumulative over time</p>
-                    <div class="h-48 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart :data="storageTrend" :margin="{ top: 4, right: 4, left: -24, bottom: 4 }">
-                                <defs>
-                                    <linearGradient id="storageGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%"  :stopColor="chartColors.cyan" :stopOpacity="0.3" />
-                                        <stop offset="95%" :stopColor="chartColors.cyan" :stopOpacity="0" />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis dataKey="date" :tickFormatter="formatDate" :tick="tickStyle" :axisLine="axisLineStyle" />
-                                <YAxis :tick="tickStyle" :axisLine="axisLineStyle" :tickFormatter="(v: number) => formatBytes(v)" />
-                                <Tooltip
-                                    :contentStyle="tooltipStyle"
-                                    :formatter="(value: number) => [formatBytes(value), 'Storage used']"
-                                    :labelFormatter="(label: string) => formatDate(label)"
-                                />
-                                <Area
-                                    type="monotone" dataKey="bytes"
-                                    :stroke="chartColors.cyan" :strokeWidth="2"
-                                    fill="url(#storageGrad)"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                    <div class="h-48">
+                        <Line :data="storageChartData" :options="storageLineOptions" />
                     </div>
                 </div>
 
@@ -342,25 +415,8 @@ const chartColors = {
                         Link views
                     </h3>
                     <p class="text-xs text-muted-foreground mb-4">Views per day</p>
-                    <div class="h-48 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart :data="linkViews" :margin="{ top: 4, right: 4, left: -24, bottom: 4 }">
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis dataKey="date" :tickFormatter="formatDate" :tick="tickStyle" :axisLine="axisLineStyle" />
-                                <YAxis :tick="tickStyle" :axisLine="axisLineStyle" :allowDecimals="false" />
-                                <Tooltip
-                                    :contentStyle="tooltipStyle"
-                                    :formatter="(value: number) => [`${value} views`, 'Link views']"
-                                    :labelFormatter="(label: string) => formatDate(label)"
-                                />
-                                <Line
-                                    type="monotone" dataKey="views"
-                                    :stroke="chartColors.emerald" :strokeWidth="2"
-                                    :dot="{ fill: chartColors.emerald, r: 3 }"
-                                    :activeDot="{ r: 5, fill: chartColors.emerald }"
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
+                    <div class="h-48">
+                        <Line :data="linkViewsChartData" :options="lineOptions" />
                     </div>
                 </div>
             </div>
