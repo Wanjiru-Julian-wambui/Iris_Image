@@ -7,6 +7,7 @@ use App\Http\Resources\ImageResource;
 use App\Models\Image;
 use App\Models\Tag;
 use App\Services\ImageService;
+use App\Services\ZipService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -14,7 +15,10 @@ use Inertia\Response;
 
 class ImageController extends Controller
 {
-    public function __construct(protected ImageService $imageService) {}
+    public function __construct(
+        protected ImageService $imageService,
+        protected ZipService   $zipService,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -215,5 +219,86 @@ class ImageController extends Controller
         $actionText = $data['action'] === 'add' ? 'added to' : 'removed from';
 
         return back()->with('success', 'Tags ' . $actionText . ' ' . count($images) . ' image(s).');
+    }
+
+    public function bulkDownload(Request $request)
+    {
+        $request->validate([
+            'ids'                    => ['required', 'array', 'min:1'],
+            'ids.*'                  => ['integer', 'exists:images,id'],
+            'watermark'              => ['sometimes', 'boolean'],
+            'watermark_text_type'    => ['sometimes', 'string', 'in:username,site_name,custom'],
+            'watermark_text'         => ['required_if:watermark_text_type,custom', 'nullable', 'string', 'max:100'],
+            'watermark_position'     => ['sometimes', 'string', 'in:bottom-right,bottom-left,top-right,top-left,center'],
+            'watermark_opacity'      => ['sometimes', 'integer', 'min:10', 'max:100'],
+        ]);
+
+        $images = $request->user()
+            ->images()
+            ->whereIn('id', $request->ids)
+            ->get();
+
+        if ($images->isEmpty()) {
+            return response()->json(['message' => 'No images found.'], 404);
+        }
+
+        // Build watermark options
+        $watermarkOptions = [];
+        if ($request->boolean('watermark')) {
+            $watermarkOptions = [
+                'enabled'  => true,
+                'text'     => $this->resolveWatermarkText($request),
+                'position' => $request->input('watermark_position', 'bottom-right'),
+                'opacity'  => (int) $request->input('watermark_opacity', 60),
+            ];
+        }
+
+        // Single image — stream directly (with optional watermark)
+        if ($images->count() === 1) {
+            $image = $images->first();
+            $image->incrementDownload();
+
+            if (!empty($watermarkOptions)) {
+                try {
+                    $tempPath = app(\App\Services\WatermarkService::class)->apply(
+                        $image,
+                        $watermarkOptions['text'],
+                        [
+                            'position' => $watermarkOptions['position'],
+                            'opacity'  => $watermarkOptions['opacity'],
+                        ]
+                    );
+
+                    return response()->download(
+                        $tempPath,
+                        $image->original_name ?? $image->name
+                    )->deleteFileAfterSend(true);
+                } catch (\Throwable) {
+                    // Fall back to redirect on watermark failure
+                    return redirect($image->url);
+                }
+            }
+
+            return redirect($image->url);
+        }
+
+        // Multiple images — zip (ZipService handles S3 + optional watermark)
+        $zipPath = $this->zipService->createFromImages($images, $watermarkOptions);
+
+        $images->each->incrementDownload();
+
+        return response()->download(
+            $zipPath,
+            'iris-images-' . now()->format('Y-m-d') . '.zip'
+        )->deleteFileAfterSend(true);
+    }
+
+    private function resolveWatermarkText(Request $request): string
+    {
+        return match ($request->input('watermark_text_type', 'site_name')) {
+            'username'  => $request->user()->name,
+            'custom'    => $request->input('watermark_text', config('app.name')),
+            default     => config('app.name'),
+        };
     }
 }

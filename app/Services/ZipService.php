@@ -8,7 +8,7 @@ use ZipArchive;
 
 class ZipService
 {
-    public function createFromImages(Collection $images): string
+    public function createFromImages(Collection $images, array $watermark = []): string
     {
         $tempDir = storage_path('app/temp');
 
@@ -23,14 +23,30 @@ class ZipService
             throw new \RuntimeException('Could not create ZIP archive.');
         }
 
-        foreach ($images as $image) {
-            $disk = config('filesystems.default');
+        $watermarkService = !empty($watermark['enabled'])
+            ? app(WatermarkService::class)
+            : null;
 
-            // Works with both local and S3
+        foreach ($images as $image) {
+            $disk     = config('filesystems.default');
             $contents = Storage::disk($disk)->get($image->path);
 
             if ($contents === null) {
                 continue;
+            }
+
+            // Apply watermark if requested
+            if ($watermarkService) {
+                try {
+                    $tempPath = $watermarkService->apply($image, $watermark['text'], [
+                        'position' => $watermark['position'] ?? 'bottom-right',
+                        'opacity'  => $watermark['opacity']  ?? 60,
+                    ]);
+                    $contents = file_get_contents($tempPath);
+                    @unlink($tempPath);
+                } catch (\Throwable) {
+                    // Watermark failed — fall back to original contents
+                }
             }
 
             $filename = $this->uniqueFilename($zip, $image->original_name ?? $image->name);

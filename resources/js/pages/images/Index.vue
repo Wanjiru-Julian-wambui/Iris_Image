@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Download, Image as ImageIcon, Plus, Trash2, Upload, GripVertical, Search, Tag, X, Check } from 'lucide-vue-next';
+import { Download, Image as ImageIcon, Plus, Trash2, Upload, GripVertical, Search, Tag, X, Check, Droplets } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useDraggable } from '@/composables/useDraggable';
 import type { BreadcrumbItem } from '@/types';
@@ -42,9 +47,8 @@ function deleteImage() {
     });
 }
 
-const selected    = ref<Set<number>>(new Set());
-const selectMode  = ref(false);
-const downloading = ref(false);
+const selected     = ref<Set<number>>(new Set());
+const selectMode   = ref(false);
 const bulkDeleting = ref(false);
 
 const selectedCount = computed(() => selected.value.size);
@@ -68,25 +72,80 @@ function toggleAll() {
     selected.value = allSelected.value ? new Set() : new Set(props.images.data.map(i => i.id));
 }
 
+// ─── Bulk Download + Watermark Modal ─────────────────────────────────────────
+const showDownloadModal  = ref(false);
+const downloading        = ref(false);
+const useWatermark       = ref(false);
+const wmTextType         = ref<'username' | 'site_name' | 'custom'>('site_name');
+const wmCustomText       = ref('');
+const wmPosition         = ref('bottom-right');
+const wmOpacity          = ref(60);
+
+const positionOptions = [
+    { label: 'Bottom right', value: 'bottom-right' },
+    { label: 'Bottom left',  value: 'bottom-left'  },
+    { label: 'Top right',    value: 'top-right'    },
+    { label: 'Top left',     value: 'top-left'     },
+    { label: 'Center',       value: 'center'       },
+];
+
+const textTypeOptions = [
+    { label: 'Site name',     value: 'site_name' },
+    { label: 'My username',   value: 'username'  },
+    { label: 'Custom text',   value: 'custom'    },
+];
+
+function openDownloadModal() {
+    if (!selectedCount.value) return;
+    showDownloadModal.value = true;
+}
+
 async function bulkDownload() {
     if (!selectedCount.value) return;
     downloading.value = true;
+
     try {
         const token = decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '');
+
+        const payload: Record<string, any> = {
+            ids: Array.from(selected.value),
+        };
+
+        if (useWatermark.value) {
+            payload.watermark           = true;
+            payload.watermark_text_type = wmTextType.value;
+            payload.watermark_position  = wmPosition.value;
+            payload.watermark_opacity   = wmOpacity.value;
+            if (wmTextType.value === 'custom') {
+                payload.watermark_text = wmCustomText.value;
+            }
+        }
+
         const res = await fetch('/images/bulk-download', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-            body: JSON.stringify({ ids: Array.from(selected.value) }),
+            body: JSON.stringify(payload),
         });
+
         if (!res.ok) throw new Error('Download failed');
-        const blob = await res.blob();
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href = url; a.download = 'iris-images.zip'; a.click();
+
+        const blob        = await res.blob();
+        const url         = URL.createObjectURL(blob);
+        const a           = document.createElement('a');
+        const contentDisp = res.headers.get('content-disposition');
+        const filename    = contentDisp?.match(/filename="?([^"]+)"?/)?.[1] ?? 'iris-images.zip';
+        a.href     = url;
+        a.download = filename;
+        a.click();
         URL.revokeObjectURL(url);
-        selected.value = new Set();
-    } catch { alert('Failed to create ZIP.'); }
-    finally { downloading.value = false; }
+
+        selected.value      = new Set();
+        showDownloadModal.value = false;
+    } catch {
+        alert('Failed to download images.');
+    } finally {
+        downloading.value = false;
+    }
 }
 
 function bulkDelete() {
@@ -157,7 +216,7 @@ function applyBatchTags() {
     });
 }
 
-const gridRef = ref<HTMLElement | null>(null);
+const gridRef    = ref<HTMLElement | null>(null);
 const imagesList = ref([...props.images.data]);
 
 const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop, handleDragEnd } = useDraggable(
@@ -206,9 +265,9 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                             {{ bulkDeleting ? 'Deleting...' : `Delete ${selectedCount}` }}
                         </Button>
                         <Button v-if="selectedCount > 0" size="sm" class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
-                                :disabled="downloading" @click="bulkDownload">
+                                @click="openDownloadModal">
                             <Download class="h-4 w-4" />
-                            {{ downloading ? 'Zipping…' : `Download ${selectedCount}` }}
+                            Download {{ selectedCount }}
                         </Button>
                     </template>
 
@@ -348,6 +407,100 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                 <DialogFooter>
                     <Button variant="outline" @click="cancelDelete">Cancel</Button>
                     <Button variant="destructive" :disabled="deleting" @click="deleteImage">{{ deleting ? 'Deleting...' : 'Delete' }}</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Bulk Download + Watermark Modal -->
+        <Dialog :open="showDownloadModal" @update:open="showDownloadModal = false">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Download {{ selectedCount }} image{{ selectedCount !== 1 ? 's' : '' }}</DialogTitle>
+                    <DialogDescription>
+                        {{ selectedCount > 1 ? 'Images will be packaged into a ZIP file.' : 'Your image will be downloaded directly.' }}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div class="space-y-4 py-2">
+                    <!-- Watermark toggle -->
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <Label class="text-sm font-medium">Add watermark</Label>
+                            <p class="text-xs text-muted-foreground">Embed text into downloaded images</p>
+                        </div>
+                        <Switch v-model:checked="useWatermark" />
+                    </div>
+
+                    <!-- Watermark options -->
+                    <Transition
+                        enter-active-class="transition-all duration-200"
+                        enter-from-class="opacity-0 -translate-y-1"
+                        leave-active-class="transition-all duration-150"
+                        leave-to-class="opacity-0 -translate-y-1"
+                    >
+                        <div v-if="useWatermark" class="space-y-3 pt-3 border-t border-border">
+                            <!-- Text type selector -->
+                            <div class="space-y-1.5">
+                                <Label class="text-xs text-muted-foreground">Watermark text</Label>
+                                <div class="flex rounded-lg border border-border overflow-hidden">
+                                    <button
+                                        v-for="opt in textTypeOptions"
+                                        :key="opt.value"
+                                        @click="wmTextType = opt.value as any"
+                                        class="flex-1 px-2 py-1.5 text-xs font-medium transition-colors"
+                                        :class="wmTextType === opt.value ? 'bg-violet-500 text-white' : 'bg-muted hover:bg-muted/80 text-muted-foreground'"
+                                    >
+                                        {{ opt.label }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Custom text input -->
+                            <div v-if="wmTextType === 'custom'" class="space-y-1">
+                                <Input
+                                    v-model="wmCustomText"
+                                    placeholder="e.g. © Your Name 2026"
+                                    maxlength="60"
+                                    class="text-sm"
+                                />
+                            </div>
+
+                            <!-- Position -->
+                            <div class="space-y-1.5">
+                                <Label class="text-xs text-muted-foreground">Position</Label>
+                                <Select v-model="wmPosition">
+                                    <SelectTrigger class="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="opt in positionOptions" :key="opt.value" :value="opt.value">
+                                            {{ opt.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <!-- Opacity -->
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between">
+                                    <Label class="text-xs text-muted-foreground">Opacity</Label>
+                                    <span class="text-xs text-muted-foreground">{{ wmOpacity }}%</span>
+                                </div>
+                                <input v-model="wmOpacity" type="range" min="10" max="100" step="5" class="w-full accent-violet-500" />
+                            </div>
+                        </div>
+                    </Transition>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" @click="showDownloadModal = false">Cancel</Button>
+                    <Button
+                        class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90"
+                        :disabled="downloading || (useWatermark && wmTextType === 'custom' && !wmCustomText.trim())"
+                        @click="bulkDownload"
+                    >
+                        <Droplets v-if="useWatermark" class="h-4 w-4" />
+                        <Download v-else class="h-4 w-4" />
+                        {{ downloading ? 'Preparing...' : useWatermark ? 'Download with watermark' : 'Download' }}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
