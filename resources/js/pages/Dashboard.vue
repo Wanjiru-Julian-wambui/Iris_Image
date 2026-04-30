@@ -1,25 +1,19 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
-import { Image, FolderOpen, Link2, Eye, HardDrive, TrendingUp } from 'lucide-vue-next';
+import { Head, Link } from '@inertiajs/vue3';
+import { ref, onMounted, computed } from 'vue';
+import { Image, HardDrive, Link2, Eye, TrendingUp } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
+    BarChart, Bar,
+    XAxis, YAxis,
+    CartesianGrid, Tooltip,
     ResponsiveContainer,
-    LineChart,
-    Line,
-    Area,
-    AreaChart,
+    LineChart, Line,
+    Area, AreaChart,
 } from 'recharts';
 import type { BreadcrumbItem } from '@/types';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: '/dashboard' }];
 
 const props = defineProps<{
     stats: {
@@ -29,17 +23,26 @@ const props = defineProps<{
         total_views: number;
         storage_used: string;
         storage_percent: number;
+        storage_limit?: number;
     };
     uploadHistory: { date: string; count: number }[];
-    storageTrend: { date: string; bytes: number }[];
-    linkViews: { date: string; views: number }[];
+    storageTrend:  { date: string; bytes: number }[];
+    linkViews:     { date: string; views: number }[];
+    recentImages?: { data: any[] };
+    user?: {
+        name: string;
+        storage_limit?: number;
+    };
 }>();
 
+// ── Formatting helpers ──────────────────────────────────────────────────────
+
 function formatBytes(bytes: number): string {
-    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
-    if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
-    if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return bytes + ' B';
+    if (!bytes || bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const val = bytes / Math.pow(1024, i);
+    return `${Number.isInteger(val) ? val : val.toFixed(2)} ${units[i]}`;
 }
 
 function formatDate(dateStr: string): string {
@@ -47,214 +50,312 @@ function formatDate(dateStr: string): string {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-const chartColors = {
-    violet: '#8b5cf6',
-    cyan: '#22d3ee',
-    emerald: '#34d399',
-    rose: '#fb7185',
-};
+const storageLimit = computed(() =>
+    props.stats.storage_limit  ? formatBytes(props.stats.storage_limit) :
+    props.user?.storage_limit  ? formatBytes(props.user.storage_limit)  : null
+);
 
-const tickStyle = { fill: '#94a3b8', fontSize: 11 };
+const actualPercent = computed(() => {
+    const raw = props.stats.storage_percent ?? 0;
+    return Math.round(raw * 100) / 100;
+});
+
+const arcPercent = computed(() => {
+    const raw = props.stats.storage_percent ?? 0;
+    if (raw > 0 && raw < 0.5) return 0.5;
+    return raw;
+});
+
+// ── Animated counters ───────────────────────────────────────────────────────
+
+const animatedImages = ref(0);
+const animatedLinks  = ref(0);
+const animatedViews  = ref(0);
+const animatedArcPct = ref(0);
+const mounted        = ref(false);
+const waving         = ref(false);
+
+function animateCounter(target: number, setter: (v: number) => void, duration = 1200) {
+    const start = performance.now();
+    const step  = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        const ease     = 1 - Math.pow(1 - progress, 3);
+        setter(Math.round(target * ease));
+        if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
+
+function animateFloat(target: number, setter: (v: number) => void, duration = 1400) {
+    const start = performance.now();
+    const step  = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        const ease     = 1 - Math.pow(1 - progress, 3);
+        setter(Math.round(target * ease * 100) / 100);
+        if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
+
+onMounted(() => {
+    setTimeout(() => {
+        mounted.value = true;
+        waving.value  = true;
+        setTimeout(() => { waving.value = false; }, 7000);
+
+        animateCounter(props.stats.total_images, v => animatedImages.value = v);
+        animateCounter(props.stats.total_links,  v => animatedLinks.value  = v);
+        animateCounter(props.stats.total_views,  v => animatedViews.value  = v);
+        animateFloat(arcPercent.value,           v => animatedArcPct.value = v);
+    }, 100);
+});
+
+// ── Storage donut ───────────────────────────────────────────────────────────
+
+const uid    = Math.random().toString(36).slice(2, 8);
+const gradId = `sg-${uid}`;
+const SIZE   = 120;
+const STROKE = 18;
+const R      = (SIZE - STROKE) / 2;
+const CIRCUM = 2 * Math.PI * R;
+
+const usedDash = computed(() => {
+    const pct = Math.min(animatedArcPct.value, 100) / 100;
+    return `${(pct * CIRCUM).toFixed(2)} ${CIRCUM.toFixed(2)}`;
+});
+
+// ── Chart shared styles ─────────────────────────────────────────────────────
+
+const tickStyle     = { fill: '#94a3b8', fontSize: 11 };
 const axisLineStyle = { stroke: 'rgba(255,255,255,0.1)' };
-const tooltipStyle = {
+const tooltipStyle  = {
     backgroundColor: '#1e1e2e',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '12px',
     fontSize: '12px',
     color: '#e2e8f0',
 };
+
+const chartColors = {
+    violet:  '#8b5cf6',
+    cyan:    '#22d3ee',
+    emerald: '#34d399',
+};
 </script>
 
 <template>
     <Head title="Dashboard" />
-
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-6xl px-4 py-8 space-y-8">
-            <!-- Header -->
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight">Dashboard</h1>
-                <p class="mt-1 text-sm text-muted-foreground">
-                    Overview of your Iris account
-                </p>
+        <div class="flex h-full flex-1 flex-col gap-6 p-6">
+
+            <!-- Hero Banner -->
+            <div
+                class="relative overflow-hidden rounded-2xl px-8 py-7 bg-gradient-to-br from-violet-600 via-blue-500 to-cyan-400"
+                :class="mounted ? 'banner-in' : 'opacity-0'"
+            >
+                <div class="pointer-events-none absolute -right-12 -top-12 h-52 w-52 rounded-full bg-white/10" />
+                <div class="pointer-events-none absolute -bottom-10 right-28 h-32 w-32 rounded-full bg-white/10" />
+                <p class="text-base font-medium text-white/70 mb-1">Welcome back</p>
+                <h1 class="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                    {{ user?.name ?? 'there' }}
+                    <span
+                        class="wave-emoji"
+                        :class="{ 'is-waving': waving }"
+                        aria-hidden="true"
+                        @mouseenter="waving = true"
+                        @mouseleave="waving = false"
+                    >👋</span>
+                </h1>
+                <p class="mt-2 text-sm text-white/60">Here's what's happening with your files today.</p>
             </div>
 
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-                <div class="rounded-2xl border border-white/8 bg-card p-4 space-y-2">
+            <!-- Stat Cards -->
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+                <!-- Total Images -->
+                <div
+                    class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-3"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.05s"
+                >
                     <div class="flex items-center gap-2 text-violet-400">
                         <Image class="h-4 w-4" />
-                        <span class="text-[10px] font-bold uppercase tracking-wider">Images</span>
+                        <span class="text-xs font-bold uppercase tracking-widest text-muted-foreground">Images</span>
                     </div>
-                    <p class="text-2xl font-bold">{{ stats.total_images }}</p>
+                    <span class="text-4xl font-bold tabular-nums">{{ animatedImages }}</span>
                 </div>
 
-                <div class="rounded-2xl border border-white/8 bg-card p-4 space-y-2">
-                    <div class="flex items-center gap-2 text-cyan-400">
-                        <FolderOpen class="h-4 w-4" />
-                        <span class="text-[10px] font-bold uppercase tracking-wider">Albums</span>
-                    </div>
-                    <p class="text-2xl font-bold">{{ stats.total_albums }}</p>
-                </div>
-
-                <div class="rounded-2xl border border-white/8 bg-card p-4 space-y-2">
-                    <div class="flex items-center gap-2 text-emerald-400">
-                        <Link2 class="h-4 w-4" />
-                        <span class="text-[10px] font-bold uppercase tracking-wider">Links</span>
-                    </div>
-                    <p class="text-2xl font-bold">{{ stats.total_links }}</p>
-                </div>
-
-                <div class="rounded-2xl border border-white/8 bg-card p-4 space-y-2">
-                    <div class="flex items-center gap-2 text-rose-400">
-                        <Eye class="h-4 w-4" />
-                        <span class="text-[10px] font-bold uppercase tracking-wider">Views</span>
-                    </div>
-                    <p class="text-2xl font-bold">{{ stats.total_views }}</p>
-                </div>
-
-                <div class="rounded-2xl border border-white/8 bg-card p-4 space-y-2 col-span-2 lg:col-span-1 xl:col-span-2">
+                <!-- Storage Donut -->
+                <div
+                    class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-3"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.12s"
+                >
                     <div class="flex items-center gap-2 text-amber-400">
                         <HardDrive class="h-4 w-4" />
-                        <span class="text-[10px] font-bold uppercase tracking-wider">Storage</span>
+                        <span class="text-xs font-bold uppercase tracking-widest text-muted-foreground">Storage</span>
                     </div>
-                    <div class="flex items-baseline gap-2">
-                        <p class="text-2xl font-bold">{{ stats.storage_used }}</p>
-                        <span class="text-xs text-muted-foreground">{{ stats.storage_percent }}%</span>
+                    <div class="flex items-center gap-4">
+                        <div class="relative shrink-0" :style="`width:${SIZE}px;height:${SIZE}px`">
+                            <svg
+                                :width="SIZE" :height="SIZE"
+                                :viewBox="`0 0 ${SIZE} ${SIZE}`"
+                                style="transform: rotate(-90deg);"
+                            >
+                                <defs>
+                                    <linearGradient :id="gradId" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="#f59e0b" />
+                                        <stop offset="100%" stop-color="#ef4444" />
+                                    </linearGradient>
+                                </defs>
+                                <circle
+                                    :cx="SIZE / 2" :cy="SIZE / 2" :r="R"
+                                    fill="none"
+                                    stroke="rgba(255,255,255,0.08)"
+                                    :stroke-width="STROKE"
+                                />
+                                <circle
+                                    :cx="SIZE / 2" :cy="SIZE / 2" :r="R"
+                                    fill="none"
+                                    :stroke="`url(#${gradId})`"
+                                    :stroke-width="STROKE"
+                                    stroke-linecap="round"
+                                    :stroke-dasharray="usedDash"
+                                    style="transition: stroke-dasharray 1.4s cubic-bezier(0.34,1.56,0.64,1)"
+                                />
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span class="text-sm font-bold leading-none">{{ actualPercent }}%</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <p class="text-lg font-bold leading-tight">{{ stats.storage_used }}</p>
+                            <p v-if="storageLimit" class="text-xs text-muted-foreground">of {{ storageLimit }}</p>
+                        </div>
                     </div>
-                    <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                            class="h-full rounded-full bg-amber-400 transition-all"
-                            :style="{ width: `${Math.min(stats.storage_percent, 100)}%` }"
-                        />
+                </div>
+
+                <!-- Active Links -->
+                <div
+                    class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-3"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.19s"
+                >
+                    <div class="flex items-center gap-2 text-cyan-400">
+                        <Link2 class="h-4 w-4" />
+                        <span class="text-xs font-bold uppercase tracking-widest text-muted-foreground">Links</span>
                     </div>
+                    <span class="text-4xl font-bold tabular-nums">{{ animatedLinks }}</span>
+                </div>
+
+                <!-- Views -->
+                <div
+                    class="stat-card rounded-2xl border border-border bg-card p-6 flex flex-col gap-3"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.26s"
+                >
+                    <div class="flex items-center gap-2 text-emerald-400">
+                        <Eye class="h-4 w-4" />
+                        <span class="text-xs font-bold uppercase tracking-widest text-muted-foreground">Views</span>
+                    </div>
+                    <span class="text-4xl font-bold tabular-nums">{{ animatedViews }}</span>
                 </div>
             </div>
 
-            <!-- Charts Grid -->
-            <div class="grid gap-6 lg:grid-cols-2">
-                <!-- Upload History — Bar Chart -->
-                <div class="rounded-2xl border border-white/8 bg-card p-6 space-y-4 lg:col-span-2">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-sm font-semibold flex items-center gap-2">
-                                <TrendingUp class="h-4 w-4 text-violet-400" />
-                                Upload history
-                            </h2>
-                            <p class="text-xs text-muted-foreground mt-0.5">Images uploaded per day — last 30 days</p>
-                        </div>
-                    </div>
-                    <div class="h-64 w-full">
+            <!-- Charts -->
+            <div class="grid gap-4 lg:grid-cols-3">
+
+                <!-- Upload History -->
+                <div
+                    class="rounded-2xl border border-border bg-card p-5"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.33s"
+                >
+                    <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+                        <TrendingUp class="h-4 w-4 text-violet-400" />
+                        Uploads per day
+                    </h3>
+                    <p class="text-xs text-muted-foreground mb-4">Last 30 days</p>
+                    <div class="h-48 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart :data="uploadHistory" :margin="{ top: 5, right: 5, left: -20, bottom: 5 }">
+                            <BarChart :data="uploadHistory" :margin="{ top: 4, right: 4, left: -24, bottom: 4 }">
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis
-                                    dataKey="date"
-                                    :tickFormatter="formatDate"
-                                    :tick="tickStyle"
-                                    :axisLine="axisLineStyle"
-                                />
-                                <YAxis
-                                    :tick="tickStyle"
-                                    :axisLine="axisLineStyle"
-                                    :allowDecimals="false"
-                                />
+                                <XAxis dataKey="date" :tickFormatter="formatDate" :tick="tickStyle" :axisLine="axisLineStyle" />
+                                <YAxis :tick="tickStyle" :axisLine="axisLineStyle" :allowDecimals="false" />
                                 <Tooltip
                                     :contentStyle="tooltipStyle"
                                     :formatter="(value: number) => [`${value} images`, 'Uploads']"
                                     :labelFormatter="(label: string) => formatDate(label)"
                                 />
-                                <Bar
-                                    dataKey="count"
-                                    :fill="chartColors.violet"
-                                    :radius="[4, 4, 0, 0]"
-                                    :maxBarSize="40"
-                                />
+                                <Bar dataKey="count" :fill="chartColors.violet" :radius="[4, 4, 0, 0]" :maxBarSize="32" />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <!-- Storage Trend — Area Chart -->
-                <div class="rounded-2xl border border-white/8 bg-card p-6 space-y-4">
-                    <div>
-                        <h2 class="text-sm font-semibold flex items-center gap-2">
-                            <HardDrive class="h-4 w-4 text-cyan-400" />
-                            Storage trend
-                        </h2>
-                        <p class="text-xs text-muted-foreground mt-0.5">Cumulative storage used over time</p>
-                    </div>
-                    <div class="h-64 w-full">
+                <!-- Storage Trend -->
+                <div
+                    class="rounded-2xl border border-border bg-card p-5"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.40s"
+                >
+                    <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+                        <HardDrive class="h-4 w-4 text-cyan-400" />
+                        Storage trend
+                    </h3>
+                    <p class="text-xs text-muted-foreground mb-4">Cumulative over time</p>
+                    <div class="h-48 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart :data="storageTrend" :margin="{ top: 5, right: 5, left: -20, bottom: 5 }">
+                            <AreaChart :data="storageTrend" :margin="{ top: 4, right: 4, left: -24, bottom: 4 }">
                                 <defs>
-                                    <linearGradient id="storageGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" :stopColor="chartColors.cyan" :stopOpacity="0.3" />
+                                    <linearGradient id="storageGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%"  :stopColor="chartColors.cyan" :stopOpacity="0.3" />
                                         <stop offset="95%" :stopColor="chartColors.cyan" :stopOpacity="0" />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis
-                                    dataKey="date"
-                                    :tickFormatter="formatDate"
-                                    :tick="tickStyle"
-                                    :axisLine="axisLineStyle"
-                                />
-                                <YAxis
-                                    :tick="tickStyle"
-                                    :axisLine="axisLineStyle"
-                                    :tickFormatter="(value: number) => formatBytes(value)"
-                                />
+                                <XAxis dataKey="date" :tickFormatter="formatDate" :tick="tickStyle" :axisLine="axisLineStyle" />
+                                <YAxis :tick="tickStyle" :axisLine="axisLineStyle" :tickFormatter="(v: number) => formatBytes(v)" />
                                 <Tooltip
                                     :contentStyle="tooltipStyle"
                                     :formatter="(value: number) => [formatBytes(value), 'Storage used']"
                                     :labelFormatter="(label: string) => formatDate(label)"
                                 />
                                 <Area
-                                    type="monotone"
-                                    dataKey="bytes"
-                                    :stroke="chartColors.cyan"
-                                    :strokeWidth="2"
-                                    fill="url(#storageGradient)"
+                                    type="monotone" dataKey="bytes"
+                                    :stroke="chartColors.cyan" :strokeWidth="2"
+                                    fill="url(#storageGrad)"
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <!-- Link Views — Line Chart -->
-                <div class="rounded-2xl border border-white/8 bg-card p-6 space-y-4">
-                    <div>
-                        <h2 class="text-sm font-semibold flex items-center gap-2">
-                            <Eye class="h-4 w-4 text-emerald-400" />
-                            Link views
-                        </h2>
-                        <p class="text-xs text-muted-foreground mt-0.5">Shared link views per day</p>
-                    </div>
-                    <div class="h-64 w-full">
+                <!-- Link Views -->
+                <div
+                    class="rounded-2xl border border-border bg-card p-5"
+                    :class="mounted ? 'card-in' : 'opacity-0'"
+                    style="animation-delay: 0.47s"
+                >
+                    <h3 class="text-sm font-semibold mb-1 flex items-center gap-2">
+                        <Eye class="h-4 w-4 text-emerald-400" />
+                        Link views
+                    </h3>
+                    <p class="text-xs text-muted-foreground mb-4">Views per day</p>
+                    <div class="h-48 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart :data="linkViews" :margin="{ top: 5, right: 5, left: -20, bottom: 5 }">
+                            <LineChart :data="linkViews" :margin="{ top: 4, right: 4, left: -24, bottom: 4 }">
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                <XAxis
-                                    dataKey="date"
-                                    :tickFormatter="formatDate"
-                                    :tick="tickStyle"
-                                    :axisLine="axisLineStyle"
-                                />
-                                <YAxis
-                                    :tick="tickStyle"
-                                    :axisLine="axisLineStyle"
-                                    :allowDecimals="false"
-                                />
+                                <XAxis dataKey="date" :tickFormatter="formatDate" :tick="tickStyle" :axisLine="axisLineStyle" />
+                                <YAxis :tick="tickStyle" :axisLine="axisLineStyle" :allowDecimals="false" />
                                 <Tooltip
                                     :contentStyle="tooltipStyle"
                                     :formatter="(value: number) => [`${value} views`, 'Link views']"
                                     :labelFormatter="(label: string) => formatDate(label)"
                                 />
                                 <Line
-                                    type="monotone"
-                                    dataKey="views"
-                                    :stroke="chartColors.emerald"
-                                    :strokeWidth="2"
+                                    type="monotone" dataKey="views"
+                                    :stroke="chartColors.emerald" :strokeWidth="2"
                                     :dot="{ fill: chartColors.emerald, r: 3 }"
                                     :activeDot="{ r: 5, fill: chartColors.emerald }"
                                 />
@@ -263,6 +364,97 @@ const tooltipStyle = {
                     </div>
                 </div>
             </div>
+
+            <!-- Recent Uploads -->
+            <div
+                class="rounded-2xl border border-border bg-card p-6"
+                :class="mounted ? 'card-in' : 'opacity-0'"
+                style="animation-delay: 0.54s"
+            >
+                <div class="mb-5 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold">Recent Uploads</h2>
+                    <Link href="/images" class="text-sm font-medium text-violet-400 hover:text-violet-300">
+                        View all →
+                    </Link>
+                </div>
+
+                <div
+                    v-if="recentImages && recentImages.data.length > 0"
+                    class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+                >
+                    <div
+                        v-for="(image, i) in recentImages.data"
+                        :key="image.id"
+                        class="group relative aspect-square overflow-hidden rounded-xl bg-muted border border-border cursor-pointer"
+                        :style="{ animationDelay: `${0.6 + i * 0.05}s` }"
+                        :class="mounted ? 'tile-in' : 'opacity-0'"
+                    >
+                        <img
+                            :src="image.thumbnail_url"
+                            :alt="image.name"
+                            class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            loading="lazy"
+                        />
+                        <div class="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/20 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                            <span class="truncate text-xs font-medium text-white">{{ image.name }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="flex flex-col items-center justify-center py-16 text-center gap-3">
+                    <p class="font-medium text-foreground">No images yet</p>
+                    <Link
+                        href="/images/create"
+                        class="rounded-xl bg-gradient-to-r from-violet-500 to-cyan-400 px-5 py-2 text-sm font-semibold text-white hover:opacity-90"
+                    >
+                        Upload images
+                    </Link>
+                </div>
+            </div>
+
         </div>
     </AppLayout>
 </template>
+
+<style>
+.wave-emoji {
+    display: inline-block;
+    transform-origin: 70% 70%;
+    cursor: default;
+    font-size: 1.8rem;
+    line-height: 1;
+}
+.wave-emoji.is-waving {
+    animation: wave-hand 2.2s ease-in-out 3;
+}
+@keyframes wave-hand {
+    0%   { transform: rotate(  0deg); }
+    10%  { transform: rotate( 14deg); }
+    20%  { transform: rotate( -8deg); }
+    30%  { transform: rotate( 14deg); }
+    40%  { transform: rotate( -4deg); }
+    50%  { transform: rotate( 10deg); }
+    60%  { transform: rotate(  0deg); }
+    100% { transform: rotate(  0deg); }
+}
+</style>
+
+<style scoped>
+.banner-in { animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.card-in { animation: fadeUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.tile-in { animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes popIn {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px -8px rgba(123, 47, 255, 0.18); }
+</style>

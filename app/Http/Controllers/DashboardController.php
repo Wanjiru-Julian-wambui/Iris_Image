@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\ImageResource;
 use App\Models\Image;
 use App\Models\SharedLink;
 use Carbon\Carbon;
@@ -77,13 +78,25 @@ class DashboardController extends Controller
             'total_views'     => SharedLink::where('created_by', $user->id)->sum('view_count') ?? 0,
             'storage_used'    => $user->storage_used_human,
             'storage_percent' => $user->storage_percent,
+            'storage_limit'   => $user->storage_limit ?? null,
         ];
+
+        // ── Recent images ──
+        $recentImages = Image::where('user_id', $user->id)
+            ->latest()
+            ->limit(12)
+            ->get();
 
         return Inertia::render('Dashboard', [
             'stats'         => $stats,
             'uploadHistory' => $uploadHistory,
             'storageTrend'  => $storageTrend,
             'linkViews'     => $linkViews,
+            'recentImages'  => ['data' => ImageResource::collection($recentImages)->resolve()],
+            'user'          => [
+                'name'          => $user->name,
+                'storage_limit' => $user->storage_limit ?? null,
+            ],
         ]);
     }
 
