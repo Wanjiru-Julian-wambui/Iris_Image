@@ -13,7 +13,13 @@ class ImageReactionController extends Controller
 
     /**
      * POST /images/{image}/reactions
-     * Image is resolved by ID (auth route), not by public token.
+     *
+     * Behaviour:
+     *  - A user/guest may hold ANY NUMBER of distinct reactions on an image
+     *    (multiple different emojis, multiple different GIFs, multiple stickers).
+     *  - Posting the SAME reaction a second time toggles it OFF (removes it).
+     *  - "Same" means: same type + same emoji (for emoji) OR same media_url (for gif/sticker)
+     *    + same user_id (auth) or same ip + fingerprint (guest).
      */
     public function store(Request $request, Image $image)
     {
@@ -35,14 +41,19 @@ class ImageReactionController extends Controller
         }
 
         if (in_array($data['type'], ['gif', 'sticker']) && isset($data['media_url'])) {
-            abort_unless($this->isAllowedMediaUrl($data['media_url']), 422, 'Media URL not from an allowed source.');
+            abort_unless(
+                $this->isAllowedMediaUrl($data['media_url']),
+                422,
+                'Media URL not from an allowed source.'
+            );
         }
 
         $userId      = auth()->id();
         $ip          = $request->ip();
         $fingerprint = $this->getFingerprint($request);
 
-        // Toggle: if identical reaction already exists, remove it
+        // ── Toggle: identical reaction already exists → remove it ──────────────
+        // "Identical" = same type + same emoji OR same media_url + same actor.
         $existing = $image->reactions()
             ->where('type', $data['type'])
             ->when(
@@ -50,9 +61,9 @@ class ImageReactionController extends Controller
                 fn($q) => $q->where('emoji', $data['emoji']),
                 fn($q) => $q->where('media_url', $data['media_url'])
             )
-            ->when($userId,  fn($q) => $q->where('user_id', $userId))
-            ->when(!$userId, fn($q) => $q->where('ip_address', $ip)
-                                         ->where('session_fingerprint', $fingerprint))
+            ->when( $userId,  fn($q) => $q->where('user_id', $userId))
+            ->when(!$userId,  fn($q) => $q->where('ip_address', $ip)
+                                          ->where('session_fingerprint', $fingerprint))
             ->first();
 
         if ($existing) {
@@ -60,14 +71,7 @@ class ImageReactionController extends Controller
             return back()->with('success', 'Reaction removed.');
         }
 
-        // Replace any previous reaction of same type from this user/guest (one per type)
-        $image->reactions()
-            ->where('type', $data['type'])
-            ->when($userId,  fn($q) => $q->where('user_id', $userId))
-            ->when(!$userId, fn($q) => $q->where('ip_address', $ip)
-                                         ->where('session_fingerprint', $fingerprint))
-            ->delete();
-
+        // ── New reaction — just add it (no "one per type" replacement) ─────────
         $image->reactions()->create([
             'type'                => $data['type'],
             'emoji'               => $data['type'] === 'emoji' ? $data['emoji'] : null,
@@ -110,7 +114,7 @@ class ImageReactionController extends Controller
         return response()->json($response->json());
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
+    // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private function isAllowedMediaUrl(string $url): bool
     {
