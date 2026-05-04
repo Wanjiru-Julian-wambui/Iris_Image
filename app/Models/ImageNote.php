@@ -10,7 +10,8 @@ class ImageNote extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['image_id', 'user_id', 'body'];
+    protected $fillable = ['image_id', 'user_id', 'body', 'ip_address',
+        'session_fingerprint',];
 
     public function image(): BelongsTo
     {

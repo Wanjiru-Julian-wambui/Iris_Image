@@ -17,6 +17,9 @@ class ImageNoteResource extends JsonResource
                 'id'     => $this->user->id,
                 'name'   => $this->user->name,
                 'avatar' => $this->user->avatar_url ?? null,
+            ], [
+                'id'   => null,
+                'name' => 'Guest',
             ],
         ];
     }

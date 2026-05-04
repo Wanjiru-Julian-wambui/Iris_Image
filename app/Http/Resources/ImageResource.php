@@ -32,6 +32,9 @@ class ImageResource extends JsonResource
             'alt_text'       => $this->alt_text,
             'created_at'     => $this->created_at->diffForHumans(),
 
+            // FIXED: Add user_reaction for public page
+            'user_reaction'  => $this->user_reaction,
+
             'reactions' => $this->whenLoaded(
                 'reactions',
                 fn() => $this->reactions_summary,

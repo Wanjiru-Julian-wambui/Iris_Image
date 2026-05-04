@@ -233,6 +233,40 @@ class ImageController extends Controller
         );
     }
 
+    /**
+     * Public batch tag — guests can add/remove tags on public images.
+     */
+    public function publicBatchTag(Request $request, Image $image)
+    {
+        abort_if($image->is_private, 403, 'Cannot tag private images.');
+
+        $data = $request->validate([
+            'tags'   => ['required', 'array'],
+            'tags.*' => ['string', 'max:50'],
+            'action' => ['required', 'in:add,remove'],
+        ]);
+
+        $tagIds = [];
+        foreach ($data['tags'] as $tagName) {
+            $name = trim($tagName);
+            if (empty($name)) continue;
+
+            $tag = Tag::firstOrCreate(
+                ['slug' => Str::slug($name)],
+                ['name' => $name]
+            );
+            $tagIds[] = $tag->id;
+        }
+
+        if ($data['action'] === 'add') {
+            $image->tags()->syncWithoutDetaching($tagIds);
+        } else {
+            $image->tags()->detach($tagIds);
+        }
+
+        return back()->with('success', 'Tags updated.');
+    }
+
     public function bulkDownload(Request $request)
     {
         $request->validate([

@@ -15,7 +15,7 @@ class PublicImageController extends Controller
     {
         $image = Image::where('public_token', $token)
             ->where('is_private', false)
-            ->with(['user', 'tags', 'reactions'])
+            ->with(['user', 'tags', 'reactions', 'notes'])
             ->firstOrFail();
 
         $userId = auth()->id();
@@ -28,6 +28,7 @@ class PublicImageController extends Controller
             ->when(!$userId, fn($q) => $q->where('ip_address', $ip)->where('session_fingerprint', $fingerprint))
             ->first();
 
+        // Set user_reaction for the resource
         $image->setAttribute('user_reaction', $userReaction?->emoji);
 
         return Inertia::render('PublicImage', [

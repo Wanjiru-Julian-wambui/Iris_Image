@@ -36,9 +36,28 @@ Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('public.i
 Route::post('/i/{image:public_token}/react', [ImageReactionController::class, 'store'])
     ->name('public.image.react');
 
+// Public reactions — guests can react via short URL
+Route::post('/i/{image:public_token}/react', [ImageReactionController::class, 'store'])
+    ->name('public.image.react');
+
+// Public tags — guests can add/remove tags
+Route::post('/i/{image:public_token}/tags', [ImageController::class, 'publicBatchTag'])
+    ->name('public.image.tags');
+
+// Public notes — guests can add notes
+Route::post('/i/{image:public_token}/notes', [ImageNoteController::class, 'storePublic'])
+    ->name('public.image.notes');
+
 // Public polls
 Route::get('/poll/{token}',       [ImagePollController::class, 'show'])->name('polls.show');
 Route::post('/poll/{token}/vote', [ImagePollController::class, 'vote'])->name('polls.vote');
+
+// Public profile
+Route::get('/@{username}', [PublicProfileController::class, 'show'])->name('profile.public');
+
+// ── Emoji & Reactions (Public — guests can react) ─────────────────────────
+Route::get('/emojis', [EmojiController::class, 'index']);
+
 
 // Public profile
 Route::get('/@{username}', [PublicProfileController::class, 'show'])->name('profile.public');
