@@ -100,7 +100,7 @@ onMounted(async () => {
     if (!clientId) return;
 
     const script   = document.createElement('script');
-    script.src     = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&disable-funding=venmo,paylater,card`;
+    script.src     = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&disable-funding=venmo,paylater`;
     script.onload  = () => mountAllButtons();
     script.onerror = () => { errorMessage.value = 'Could not load PayPal. Please refresh.'; };
     document.head.appendChild(script);
