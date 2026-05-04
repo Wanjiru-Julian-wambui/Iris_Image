@@ -1,4 +1,6 @@
-# 🔵 Iris — Your Images. Everywhere.
+<img src="public/favicon.png" width="32" align="left" />
+
+# Iris — Your Images. Everywhere.
 
 ![Iris Platform](welcome.png)
 
