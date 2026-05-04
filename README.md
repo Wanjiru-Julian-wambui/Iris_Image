@@ -1,6 +1,7 @@
-<img src="public/favicon.png" width="32" align="left" />
-
-# Iris — Your Images. Everywhere.
+<div align="center">
+  <img src="public/favicon.png" width="48" />
+  <h1>Iris — Your Images. Everywhere.</h1>
+</div>
 
 ![Iris Platform](welcome.png)
 
