@@ -96,7 +96,7 @@ const wmCustomText = ref('');
 const wmSymbol = ref<'none' | 'copyright' | 'trademark' | 'registered'>('none');
 
 // layout
-const wmMode     = ref<'single' | 'tiled'>('single');
+const wmMode     = ref<'single' | 'tiled'>('tiled');
 const wmPosition = ref('bottom-right');
 const wmDensity  = ref<number>(3);
 const wmAngle    = ref<number>(-30);
@@ -160,7 +160,7 @@ function closeDownloadModal() {
     wmTextType.value        = 'site_name';
     wmCustomText.value      = '';
     wmSymbol.value          = 'none';
-    wmMode.value            = 'single';
+    wmMode.value            = 'tiled';
     wmPosition.value        = 'bottom-right';
     wmDensity.value         = 3;
     wmAngle.value           = -30;
@@ -652,12 +652,45 @@ const { draggedIndex, dragOverIndex, handleDragStart, handleDragOver, handleDrop
                             </Select>
                         </div>
 
-                        <!-- Density (tiled mode only) -->
-                        <div v-show="wmMode === 'tiled'" class="space-y-1.5">
-                            <div class="flex justify-between">
-                                <Label class="text-xs text-muted-foreground">Density</Label>
-                                <span class="text-xs text-muted-foreground">{{ wmDensity }} / 6</span>
+                        <!-- Repeat count — shown for BOTH modes, but labelled differently -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <Label class="text-xs text-muted-foreground">
+                                    {{ wmMode === 'tiled' ? 'Repeat count (per row)' : 'Copies' }}
+                                </Label>
+                                <span class="text-xs font-semibold text-violet-500">{{ wmDensity }}×</span>
                             </div>
+
+                            <!-- Visual dot-grid preview -->
+                            <div class="flex gap-1.5 items-center mb-1">
+                                <div
+                                    v-for="col in 6" :key="col"
+                                    class="flex flex-col gap-1"
+                                >
+                                    <div
+                                        v-for="row in (wmMode === 'tiled' ? 3 : 1)" :key="row"
+                                        class="w-3 h-3 rounded-sm transition-colors"
+                                        :class="col <= wmDensity ? 'bg-violet-500' : 'bg-muted border border-border'"
+                                    />
+                                </div>
+                                <span class="text-xs text-muted-foreground ml-1">
+                                    {{ wmMode === 'tiled' ? wmDensity + ' cols × 3 rows' : wmDensity + ' cop' + (wmDensity === 1 ? 'y' : 'ies') }}
+                                </span>
+                            </div>
+
+                            <!-- Quick preset buttons -->
+                            <div class="flex gap-1.5 flex-wrap">
+                                <button
+                                    v-for="n in [1, 2, 3, 4, 5, 6]" :key="n"
+                                    type="button"
+                                    @click.stop="wmDensity = n"
+                                    class="w-9 h-7 rounded text-xs font-medium border transition-colors"
+                                    :class="wmDensity === n ? 'bg-violet-500 text-white border-violet-500' : 'bg-muted text-muted-foreground border-border hover:border-violet-400 hover:text-violet-400'"
+                                >
+                                    {{ n }}×
+                                </button>
+                            </div>
+
                             <input v-model="wmDensity" type="range" min="1" max="6" step="1"
                                    class="w-full accent-violet-500" />
                         </div>

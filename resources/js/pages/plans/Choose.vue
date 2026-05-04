@@ -1,15 +1,23 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { Check, Loader2, ShieldCheck } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { nextTick, onMounted, ref, computed } from 'vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Plan } from '@/types/plan';
 import { featureLabels } from '@/types/plan';
 
 const props = defineProps<{
-    plans: { data: Plan[] };
+    plans: { data: Plan[] } | Plan[];
 }>();
+
+// Normalise ResourceCollection vs plain array — prevents blank renders
+const planList = computed<Plan[]>(() => {
+    if (!props.plans) return [];
+    if (Array.isArray(props.plans)) return props.plans;
+    if (Array.isArray((props.plans as { data: Plan[] }).data)) return (props.plans as { data: Plan[] }).data;
+    return [];
+});
 
 const selecting    = ref<number | null>(null);
 const errorMessage = ref('');
@@ -76,17 +84,16 @@ function mountPayPalButton(plan: Plan) {
     }).render(`#paypal-btn-${plan.id}`);
 }
 
-function mountAllButtons() {
+async function mountAllButtons() {
     sdkLoaded.value = true;
-    props.plans.data
+    // Wait for Vue to finish rendering the plan cards so the target divs exist
+    await nextTick();
+    planList.value
         .filter(p => !p.is_free)
         .forEach(p => mountPayPalButton(p));
 }
 
 onMounted(() => {
-    // SDK is loaded lazily here so the client ID is baked into the
-    // compiled JS bundle (via import.meta.env) rather than printed
-    // in plain HTML by the Blade layout.
     // @ts-ignore
     if (window.paypal) {
         mountAllButtons();
@@ -127,9 +134,14 @@ onMounted(() => {
             {{ errorMessage }}
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+        <!-- Show a message if no plans loaded (helps diagnose blank page) -->
+        <div v-if="planList.length === 0" class="text-muted-foreground text-sm">
+            No plans available. Please contact support.
+        </div>
+
+        <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
             <div
-                v-for="plan in plans.data"
+                v-for="plan in planList"
                 :key="plan.id"
                 class="relative rounded-2xl border p-8 flex flex-col transition-all hover:shadow-lg"
                 :class="plan.slug === 'pro'

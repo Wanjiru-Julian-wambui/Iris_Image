@@ -62,7 +62,7 @@ class WatermarkService
         if ($opts['mode'] === 'tiled') {
             $this->applyTiled($gd, $text, $fontPath, $fontSize, $angle, $textColor, $shadowColor, (int) $opts['density']);
         } else {
-            $this->applySingle($gd, $text, $fontPath, $fontSize, $angle, $textColor, $shadowColor, $opts['position'], (int) $opts['padding']);
+            $this->applySingle($gd, $text, $fontPath, $fontSize, $angle, $textColor, $shadowColor, $opts['position'], (int) $opts['padding'], (int) $opts['density']);
         }
 
         $tempDir = storage_path('app/temp');
@@ -77,38 +77,65 @@ class WatermarkService
         return $tempPath;
     }
 
-    private function applySingle(\GdImage $gd, string $text, string $fontPath, int $fontSize, int $angle, int $textColor, int $shadowColor, string $position, int $padding): void
+    private function applySingle(\GdImage $gd, string $text, string $fontPath, int $fontSize, int $angle, int $textColor, int $shadowColor, string $position, int $padding, int $density = 1): void
     {
         $iW   = imagesx($gd);
         $iH   = imagesy($gd);
-        $bbox = imagettfbbox($fontSize, $angle, $fontPath, $text);
-        $tW   = abs($bbox[4] - $bbox[0]);
-        $tH   = abs($bbox[5] - $bbox[1]);
 
-        [$x, $y] = $this->resolvePosition($position, $iW, $iH, $tW, $tH, $padding);
-        imagettftext($gd, $fontSize, $angle, $x + 2, $y + 2, $shadowColor, $fontPath, $text);
-        imagettftext($gd, $fontSize, $angle, $x,     $y,     $textColor,   $fontPath, $text);
+        // Measure at 0° for reliable sizing
+        $bboxFlat = imagettfbbox($fontSize, 0, $fontPath, $text);
+        $tW       = abs($bboxFlat[4] - $bboxFlat[0]);
+        $tH       = abs($bboxFlat[5] - $bboxFlat[1]);
+
+        if ($density <= 1) {
+            // Single copy at chosen position
+            [$x, $y] = $this->resolvePosition($position, $iW, $iH, $tW, $tH, $padding);
+            imagettftext($gd, $fontSize, $angle, $x + 2, $y + 2, $shadowColor, $fontPath, $text);
+            imagettftext($gd, $fontSize, $angle, $x,     $y,     $textColor,   $fontPath, $text);
+            return;
+        }
+
+        // Multiple copies: spread evenly across the image in a diagonal line
+        $stepX = (int) ($iW / ($density + 1));
+        $stepY = (int) ($iH / ($density + 1));
+        for ($i = 1; $i <= $density; $i++) {
+            $x = $stepX * $i - (int)($tW / 2);
+            $y = $stepY * $i;
+            imagettftext($gd, $fontSize, $angle, $x + 2, $y + 2, $shadowColor, $fontPath, $text);
+            imagettftext($gd, $fontSize, $angle, $x,     $y,     $textColor,   $fontPath, $text);
+        }
     }
 
     private function applyTiled(\GdImage $gd, string $text, string $fontPath, int $fontSize, int $angle, int $textColor, int $shadowColor, int $density): void
     {
         $iW      = imagesx($gd);
         $iH      = imagesy($gd);
-        $bbox    = imagettfbbox($fontSize, $angle, $fontPath, $text);
-        $tW      = abs($bbox[4] - $bbox[0]) + 20;
-        $tH      = abs($bbox[5] - $bbox[1]) + 20;
         $density = max(1, min(6, $density));
 
-        // spacingX based on density: more density = tighter spacing
-        $spacingX = (int) ($iW / max(1, $density));
-        $spacingY = max((int) ($tH * (3.5 - ($density * 0.3))), $tH + 20);
+        // Measure at 0° so the bbox reflects the raw text size, not the rotated envelope.
+        // Using the rotated bbox inflates spacing dramatically and causes only 1 tile to appear.
+        $bboxFlat = imagettfbbox($fontSize, 0, $fontPath, $text);
+        $textW    = abs($bboxFlat[4] - $bboxFlat[0]);
+        $textH    = abs($bboxFlat[5] - $bboxFlat[1]);
+
+        // Gap between tiles — density 1 = loose, density 6 = tight
+        $gapMultiplier = 4.5 - ($density * 0.5);           // 4.0 … 1.5
+        $spacingX = (int) ($textW * $gapMultiplier) + 20;
+        $spacingY = (int) ($textH * $gapMultiplier * 1.8) + 20;
+
+        // Ensure we always have enough columns and rows to cover the image
+        $spacingX = max($spacingX, 60);
+        $spacingY = max($spacingY, 40);
 
         $row = 0;
-        for ($y = (int)($tH * 1.5); $y < $iH + $tH * 2; $y += $spacingY) {
+        // Start above the image top so rotated text at the top edge is visible
+        for ($y = -$spacingY; $y < $iH + $spacingY * 2; $y += $spacingY) {
+            // Stagger every other row by half the column spacing
             $offsetX = ($row % 2 === 1) ? (int) ($spacingX / 2) : 0;
-            for ($x = $offsetX - $tW; $x < $iW + $tW; $x += $spacingX) {
-                $baseY = $y + $tH;
-                imagettftext($gd, $fontSize, $angle, $x + 2, $baseY + 2, $shadowColor, $fontPath, $text);
+            for ($x = $offsetX - $spacingX; $x < $iW + $spacingX; $x += $spacingX) {
+                // baseline for imagettftext = y + textH (text renders above baseline)
+                $baseY = $y + $textH;
+                imagettftext($gd, $fontSize, $angle, $x + 1, $baseY + 1, $shadowColor, $fontPath, $text);
                 imagettftext($gd, $fontSize, $angle, $x,     $baseY,     $textColor,   $fontPath, $text);
             }
             $row++;

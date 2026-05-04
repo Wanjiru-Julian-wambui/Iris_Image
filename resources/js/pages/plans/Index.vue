@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { onMounted, ref } from 'vue';
+import { nextTick, onMounted, ref, computed } from 'vue';
+import { Crown, Zap } from 'lucide-vue-next';
 import PlanCard from '@/components/Plans/PlanCard.vue';
+import PlanBadge from '@/components/Plans/PlanBadge.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import type { Plan } from '@/types/plan';
 
 const props = defineProps<{
-    plans: { data: Plan[] };
+    plans: { data: Plan[] } | Plan[];
     currentPlan: Plan | null;
 }>();
 
@@ -15,6 +17,15 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Plans',     href: '/plans' },
 ];
+
+// Normalise: Inertia ResourceCollection wraps in { data: [...] }, but guard
+// against plain arrays too so the page never goes blank.
+const planList = computed<Plan[]>(() => {
+    if (!props.plans) return [];
+    if (Array.isArray(props.plans)) return props.plans;
+    if (Array.isArray((props.plans as { data: Plan[] }).data)) return (props.plans as { data: Plan[] }).data;
+    return [];
+});
 
 const errorMessage = ref('');
 const successMsg   = ref('');
@@ -67,17 +78,18 @@ function mountPayPalButton(plan: Plan) {
     }).render(`#paypal-btn-${plan.id}`);
 }
 
-function mountAllButtons() {
-    props.plans.data
+async function mountAllButtons() {
+    // Wait for Vue to finish rendering the plan cards before injecting PayPal buttons
+    await nextTick();
+    planList.value
         .filter(p => !p.is_free && p.id !== props.currentPlan?.id)
         .forEach(p => mountPayPalButton(p));
 }
 
-onMounted(() => {
+onMounted(async () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('changed')) successMsg.value = '🎉 Your plan has been updated!';
 
-    // Load SDK lazily — client ID comes from the compiled bundle, not HTML
     // @ts-ignore
     if (window.paypal) {
         mountAllButtons();
@@ -100,14 +112,48 @@ onMounted(() => {
         <Head title="Plans" />
 
         <div class="max-w-5xl mx-auto px-4 py-10">
+
+            <!-- Page heading -->
             <div class="text-center mb-10">
                 <h1 class="text-3xl font-bold tracking-tight mb-2">Plans &amp; Billing</h1>
-                <p class="text-muted-foreground">
-                    You are currently on the
-                    <span class="font-semibold text-foreground">{{ currentPlan ? currentPlan.name : 'Free' }}</span> plan.
+                <p class="text-muted-foreground text-sm">
+                    Upgrade or downgrade at any time. Changes take effect immediately.
                 </p>
             </div>
 
+            <!-- ── Current plan hero ──────────────────────────────── -->
+            <div
+                v-if="currentPlan"
+                class="mb-10 rounded-2xl border p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                :class="currentPlan.is_free
+                    ? 'border-border bg-muted/40'
+                    : 'border-[#7B2FFF]/40 bg-gradient-to-r from-[#7B2FFF]/10 to-[#00E5FF]/5'"
+            >
+                <div class="flex items-center gap-4">
+                    <div
+                        class="flex size-12 shrink-0 items-center justify-center rounded-xl"
+                        :class="currentPlan.is_free ? 'bg-muted' : 'bg-gradient-to-br from-[#7B2FFF] to-[#00E5FF]'"
+                    >
+                        <Crown class="h-5 w-5" :class="currentPlan.is_free ? 'text-muted-foreground' : 'text-white'" />
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Current plan</p>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl font-bold tracking-tight">{{ currentPlan.name }}</span>
+                            <PlanBadge :plan="currentPlan" size="sm" />
+                        </div>
+                        <p class="text-sm text-muted-foreground mt-0.5">
+                            {{ currentPlan.storage_limit_human }} storage &mdash; {{ currentPlan.price_formatted }}
+                            <span v-if="!currentPlan.is_free">/mo</span>
+                        </p>
+                    </div>
+                </div>
+                <div v-if="!currentPlan.is_free" class="flex items-center gap-1.5 rounded-full bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-700 shrink-0">
+                    <Zap class="h-3 w-3" /> Active subscription
+                </div>
+            </div>
+
+            <!-- Alerts -->
             <div v-if="successMsg" class="mb-8 rounded-xl bg-green-500/10 border border-green-500/20 px-5 py-4 text-sm text-green-700 text-center font-medium">
                 {{ successMsg }}
             </div>
@@ -115,9 +161,15 @@ onMounted(() => {
                 {{ errorMessage }}
             </div>
 
+            <!-- ── Heading for upgrade section ────────────────────── -->
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">
+                {{ currentPlan ? 'Available plans' : 'Choose a plan' }}
+            </h2>
+
+            <!-- Plan cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <PlanCard
-                    v-for="plan in plans.data"
+                    v-for="plan in planList"
                     :key="plan.id"
                     :plan="plan"
                     :current-plan="currentPlan"
