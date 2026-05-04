@@ -17,6 +17,7 @@ use App\Http\Controllers\ImagePollController;
 use App\Http\Controllers\ImageReactionController;
 use App\Http\Controllers\ImageVersionController;
 use App\Http\Controllers\Profile\PublicProfileController;
+use App\Http\Controllers\EmojiController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -30,16 +31,22 @@ Route::post('/share/{token}', [SharedLinkController::class, 'verify'])->name('sh
 // ─── Public routes (no auth required) ────────────────────────────────────────
 
 Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('public.image');
-Route::get('/api/emojis', [EmojiController::class, 'index'])->name('api.emojis');
 
-// GIF / sticker search proxy — keeps Giphy API key server-side
-Route::get('/reactions/giphy', [ImageReactionController::class, 'searchGiphy'])->name('reactions.giphy');
-
-Route::get('/poll/{token}',         [ImagePollController::class, 'show'])->name('polls.show');
-Route::post('/poll/{token}/vote',   [ImagePollController::class, 'vote'])->name('polls.vote');
+// Public polls
+Route::get('/poll/{token}',       [ImagePollController::class, 'show'])->name('polls.show');
+Route::post('/poll/{token}/vote', [ImagePollController::class, 'vote'])->name('polls.vote');
 
 // Public profile
 Route::get('/@{username}', [PublicProfileController::class, 'show'])->name('profile.public');
+
+// ── Emoji & Reactions (Public — guests can react) ─────────────────────────
+Route::get('/emojis', [EmojiController::class, 'index']);
+
+// Reaction routes MUST be before /images/{image} wildcard in auth group
+Route::post('/images/{image}/reactions', [ImageReactionController::class, 'store'])
+    ->name('images.reactions.store');
+Route::get('/reactions/giphy', [ImageReactionController::class, 'searchGiphy'])
+    ->name('reactions.giphy');
 
 // ─── Authenticated routes ─────────────────────────────────────────────────────
 
@@ -66,10 +73,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/images/{image}',          [ImageController::class, 'update'])->name('images.update');
         Route::delete('/images/{image}',       [ImageController::class, 'destroy'])->name('images.destroy');
         Route::get('/images/{image}/download', [ImageController::class, 'download'])->name('images.download');
-
-        // Reactions — resolved by image ID (auth route, not public token)
-        Route::post('/images/{image}/reactions', [ImageReactionController::class, 'store'])
-            ->name('images.reactions.store');
 
         // Replace image / upload new version
         Route::post('/images/{image}/replace', [ImageVersionController::class, 'replace'])
