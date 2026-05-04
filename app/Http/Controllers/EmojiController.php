@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Cache;
 
 class EmojiController extends Controller
 {
-    
     public function index(): JsonResponse
     {
         $emojis = Cache::remember('emojis_all', 86400, function () {
@@ -22,8 +21,11 @@ class EmojiController extends Controller
         });
 
         $transformed = array_map(function ($item) {
+            // Convert U+XXXX code points to actual emoji characters
+            $emoji = $this->toEmoji($item['unicode'][0] ?? $item['character'] ?? '');
+
             return [
-                'emoji'    => $item['unicode'][0] ?? $item['character'] ?? '',
+                'emoji'    => $emoji,
                 'name'     => $item['name'] ?? 'Unknown',
                 'category' => $item['category'] ?? 'Other',
                 'group'    => $item['group'] ?? 'Other',
@@ -38,5 +40,43 @@ class EmojiController extends Controller
         $transformed = array_filter($transformed, fn($e) => !empty($e['emoji']));
 
         return response()->json(array_values($transformed));
+    }
+
+    /**
+     * Convert Unicode code point string (U+1F600) to actual emoji character.
+     */
+    private function toEmoji(string $value): string
+    {
+        // If it's already an emoji character, return as-is
+        if (mb_strlen($value) === 1 || preg_match('/\p{So}/u', $value)) {
+            return $value;
+        }
+
+        // Handle U+XXXX format
+        if (str_starts_with($value, 'U+')) {
+            $hex = substr($value, 2);
+            $codePoint = hexdec($hex);
+            return mb_chr($codePoint, 'UTF-8') ?? '';
+        }
+
+        // Handle multiple code points separated by space (e.g., "U+1F1FA U+1F1F8")
+        if (str_contains($value, 'U+')) {
+            $parts = explode(' ', $value);
+            $result = '';
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if (str_starts_with($part, 'U+')) {
+                    $hex = substr($part, 2);
+                    $codePoint = hexdec($hex);
+                    $char = mb_chr($codePoint, 'UTF-8');
+                    if ($char) {
+                        $result .= $char;
+                    }
+                }
+            }
+            return $result;
+        }
+
+        return $value;
     }
 }
