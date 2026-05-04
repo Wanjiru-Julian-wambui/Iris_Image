@@ -211,7 +211,12 @@ const submitting = ref(false);
 // ── Computed: what's already reacted ────────────────────────────────────────
 
 const reactions = computed(() => {
-    return (props.image.reactions ?? { emoji: {}, gifs: [], stickers: [] }) as {
+    const r = props.image.reactions;
+    return {
+        emoji:    (r && r.emoji)    ? r.emoji    : {},
+        gifs:     (r && r.gifs)     ? r.gifs     : [],
+        stickers: (r && r.stickers) ? r.stickers : [],
+    } as {
         emoji: Record<string, number>;
         gifs: { media_url: string; media_label: string | null; media_source: string; count: number }[];
         stickers: { media_url: string; media_label: string | null; media_source: string; count: number }[];
