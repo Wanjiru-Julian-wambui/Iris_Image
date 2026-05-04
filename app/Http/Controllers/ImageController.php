@@ -61,7 +61,17 @@ class ImageController extends Controller
     {
         abort_unless($image->user_id === auth()->id(), 403);
 
-        $image->load(['user', 'sharedLinks', 'notes.user', 'tags', 'reactions', 'versions']);
+        // Eager-load everything the Show page needs in one query set.
+        // 'reactions' must be loaded so reactions_summary accessor can group them
+        // without firing additional queries per type.
+        $image->load([
+            'user',
+            'sharedLinks',
+            'notes.user',
+            'tags',
+            'reactions',
+            'versions',
+        ]);
 
         return Inertia::render('images/Show', [
             'image' => new ImageResource($image),
@@ -73,18 +83,35 @@ class ImageController extends Controller
         $images = $request->user()
             ->images()
             ->with('tags')
-            ->when($request->search, fn($q, $s) => $q->search($s))
+            ->when($request->search,  fn($q, $s) => $q->search($s))
             ->when($request->sort === 'oldest',   fn($q) => $q->oldest())
             ->when($request->sort === 'largest',  fn($q) => $q->orderByDesc('size'))
             ->when($request->sort === 'smallest', fn($q) => $q->orderBy('size'))
             ->when($request->sort === 'name',     fn($q) => $q->orderBy('name'))
-            ->when(!$request->sort || $request->sort === 'latest', fn($q) => $q->latest())
+            ->when(
+                !$request->sort || $request->sort === 'latest',
+                fn($q) => $q->latest()
+            )
             ->paginate(40);
 
         return Inertia::render('Gallery', [
             'images'  => ImageResource::collection($images),
             'filters' => $request->only(['search', 'sort']),
         ]);
+    }
+
+    public function update(Request $request, Image $image)
+    {
+        abort_unless($image->user_id === auth()->id(), 403);
+
+        $data = $request->validate([
+            'caption'  => ['nullable', 'string', 'max:2000'],
+            'alt_text' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $image->update($data);
+
+        return back()->with('success', 'Image updated.');
     }
 
     public function destroy(Image $image)
@@ -128,20 +155,6 @@ class ImageController extends Controller
         return back()->with('success', 'Images reordered.');
     }
 
-    public function update(Request $request, Image $image)
-    {
-        abort_unless($image->user_id === auth()->id(), 403);
-
-        $data = $request->validate([
-            'caption'  => ['nullable', 'string', 'max:2000'],
-            'alt_text' => ['nullable', 'string', 'max:500'],
-        ]);
-
-        $image->update($data);
-
-        return back()->with('success', 'Image updated.');
-    }
-
     public function download(Image $image)
     {
         abort_unless($image->user_id === auth()->id(), 403);
@@ -151,6 +164,10 @@ class ImageController extends Controller
         return redirect($image->url);
     }
 
+    /**
+     * POST /images/{image}/replace
+     * Upload a new file as the current image; old file is archived as a version.
+     */
     public function replace(Request $request, Image $image)
     {
         abort_unless($image->user_id === auth()->id(), 403);
@@ -166,8 +183,8 @@ class ImageController extends Controller
             $image,
             $request->file('file'),
             ['strip_exif' => $data['strip_exif'] ?? config('iris.strip_exif')],
-            $data['label'] ?? null,
-            $data['change_note'] ?? null
+            $data['label']       ?? null,
+            $data['change_note'] ?? null,
         );
 
         return back()->with('success', 'Image replaced. Previous version saved.');
@@ -218,26 +235,28 @@ class ImageController extends Controller
 
         $actionText = $data['action'] === 'add' ? 'added to' : 'removed from';
 
-        return back()->with('success', 'Tags ' . $actionText . ' ' . count($images) . ' image(s).');
+        return back()->with('success',
+            'Tags ' . $actionText . ' ' . count($images) . ' image(s).'
+        );
     }
 
     public function bulkDownload(Request $request)
     {
         $request->validate([
-            'ids'                    => ['required', 'array', 'min:1'],
-            'ids.*'                  => ['integer', 'exists:images,id'],
-            'watermark'              => ['sometimes', 'boolean'],
-            'watermark_text_type'    => ['sometimes', 'string', 'in:username,site_name,custom'],
-            'watermark_text'         => ['required_if:watermark_text_type,custom', 'nullable', 'string', 'max:100'],
-            'watermark_mode'         => ['sometimes', 'string', 'in:single,tiled'],
-            'watermark_position'     => ['sometimes', 'string', 'in:bottom-right,bottom-left,top-right,top-left,center'],
-            'watermark_opacity'      => ['sometimes', 'integer', 'min:10', 'max:100'],
-            'watermark_font'         => ['sometimes', 'string', 'in:sans,sans-bold,serif,serif-bold,mono,oblique'],
-            'watermark_size'         => ['sometimes', 'integer', 'min:8', 'max:120'],
-            'watermark_angle'        => ['sometimes', 'integer', 'min:-90', 'max:90'],
-            'watermark_density'      => ['sometimes', 'integer', 'min:1', 'max:6'],
-            'watermark_color'        => ['sometimes', 'string', 'in:white,black,gray'],
-            'watermark_symbol'       => ['sometimes', 'nullable', 'string', 'max:5'],
+            'ids'                 => ['required', 'array', 'min:1'],
+            'ids.*'               => ['integer', 'exists:images,id'],
+            'watermark'           => ['sometimes', 'boolean'],
+            'watermark_text_type' => ['sometimes', 'string', 'in:username,site_name,custom'],
+            'watermark_text'      => ['required_if:watermark_text_type,custom', 'nullable', 'string', 'max:100'],
+            'watermark_mode'      => ['sometimes', 'string', 'in:single,tiled'],
+            'watermark_position'  => ['sometimes', 'string', 'in:bottom-right,bottom-left,top-right,top-left,center'],
+            'watermark_opacity'   => ['sometimes', 'integer', 'min:10', 'max:100'],
+            'watermark_font'      => ['sometimes', 'string', 'in:sans,sans-bold,serif,serif-bold,mono,oblique'],
+            'watermark_size'      => ['sometimes', 'integer', 'min:8', 'max:120'],
+            'watermark_angle'     => ['sometimes', 'integer', 'min:-90', 'max:90'],
+            'watermark_density'   => ['sometimes', 'integer', 'min:1', 'max:6'],
+            'watermark_color'     => ['sometimes', 'string', 'in:white,black,gray'],
+            'watermark_symbol'    => ['sometimes', 'nullable', 'string', 'max:5'],
         ]);
 
         $images = $request->user()
@@ -249,7 +268,6 @@ class ImageController extends Controller
             return response()->json(['message' => 'No images found.'], 404);
         }
 
-        // Build watermark options
         $watermarkOptions = [];
         if ($request->boolean('watermark')) {
             $watermarkOptions = [
@@ -267,7 +285,7 @@ class ImageController extends Controller
             ];
         }
 
-        // Single image — always stream as a blob (fetch() cannot follow S3 redirects)
+        // Single image — stream as blob so fetch() works with S3 redirects
         if ($images->count() === 1) {
             $image = $images->first();
             $image->incrementDownload();
@@ -288,7 +306,6 @@ class ImageController extends Controller
                 )->deleteFileAfterSend(true);
             }
 
-            // No watermark — stream S3 bytes directly so fetch() receives the blob
             $disk     = config('filesystems.default');
             $contents = \Illuminate\Support\Facades\Storage::disk($disk)->get($image->path);
 
@@ -298,7 +315,7 @@ class ImageController extends Controller
             ]);
         }
 
-        // Multiple images — zip (ZipService handles S3 + optional watermark)
+        // Multiple images — zip
         $zipPath = $this->zipService->createFromImages($images, $watermarkOptions);
 
         $images->each->incrementDownload();

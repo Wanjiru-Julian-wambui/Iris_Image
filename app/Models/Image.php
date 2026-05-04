@@ -15,26 +15,10 @@ class Image extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
-        'name',
-        'original_name',
-        'path',
-        'thumbnail_path',
-        'url',
-        'thumbnail_url',
-        'mime_type',
-        'extension',
-        'size',
-        'width',
-        'height',
-        'is_private',
-        'exif_stripped',
-        'public_token',
-        'sort_order',
-        'download_count',
-        'caption',
-        'alt_text',
-        'hash',
+        'user_id', 'name', 'original_name', 'path', 'thumbnail_path',
+        'url', 'thumbnail_url', 'mime_type', 'extension', 'size',
+        'width', 'height', 'is_private', 'exif_stripped', 'public_token',
+        'sort_order', 'download_count', 'caption', 'alt_text', 'hash',
     ];
 
     protected $casts = [
@@ -45,6 +29,12 @@ class Image extends Model
         'height'         => 'integer',
         'sort_order'     => 'integer',
         'download_count' => 'integer',
+    ];
+
+    protected $appends = [
+        'size_human',
+        'public_url',
+        'reactions_summary', // renamed to avoid clashing with reactions() relationship
     ];
 
     protected static function boot(): void
@@ -86,9 +76,16 @@ class Image extends Model
         return $this->belongsToMany(Tag::class, 'image_tag');
     }
 
+    // Renamed from reactions() to avoid shadowing the accessor
     public function reactions(): HasMany
     {
         return $this->hasMany(ImageReaction::class);
+    }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(ImageVersion::class)
+            ->orderBy('version_number', 'desc');
     }
 
     public function pollsAsA(): HasMany
@@ -101,30 +98,20 @@ class Image extends Model
         return $this->hasMany(ImagePoll::class, 'image_b_id');
     }
 
-    public function versions(): HasMany
-    {
-        return $this->hasMany(ImageVersion::class)
-            ->orderBy('version_number', 'desc');
-    }
-
     // ─── Scopes ───────────────────────────────────────────────────────────────
 
     public function scopeSearch($query, string $term)
     {
-        if (empty($term)) {
-            return $query;
-        }
+        if (empty($term)) return $query;
 
         $like = '%' . $term . '%';
 
-        return $query->where(function ($q) use ($like, $term) {
+        return $query->where(function ($q) use ($like) {
             $q->where('name', 'like', $like)
               ->orWhere('original_name', 'like', $like)
               ->orWhere('caption', 'like', $like)
               ->orWhere('alt_text', 'like', $like)
-              ->orWhereHas('tags', function ($tagQuery) use ($like) {
-                  $tagQuery->where('name', 'like', $like);
-              });
+              ->orWhereHas('tags', fn($tq) => $tq->where('name', 'like', $like));
         });
     }
 
@@ -135,11 +122,9 @@ class Image extends Model
         if (!empty($this->attributes['url'])) {
             return $this->attributes['url'];
         }
-
         if (!empty($this->path)) {
             return Storage::disk(config('filesystems.default'))->url($this->path);
         }
-
         return '';
     }
 
@@ -148,11 +133,9 @@ class Image extends Model
         if (!empty($this->attributes['thumbnail_url'])) {
             return $this->attributes['thumbnail_url'];
         }
-
         if (!empty($this->thumbnail_path)) {
             return Storage::disk(config('filesystems.default'))->url($this->thumbnail_path);
         }
-
         return $this->url;
     }
 
@@ -166,11 +149,10 @@ class Image extends Model
     public function getEmbedCodesAttribute(): array
     {
         $url = $this->public_url;
-
         return [
             'url'      => $url,
             'html'     => '<img src="' . e($url) . '" alt="' . e($this->alt_text ?? $this->name) . '" />',
-            'markdown' => '![' . e($this->alt_text ?? $this->name) . '](' . $url . ')',
+            'markdown' => '![' . ($this->alt_text ?? $this->name) . '](' . $url . ')',
             'bbcode'   => '[img]' . $url . '[/img]',
         ];
     }
@@ -180,28 +162,57 @@ class Image extends Model
         return ($this->versions()->max('version_number') ?? 0) + 1;
     }
 
-    public function getReactionCountsAttribute(): array
+    /**
+     * Renamed from getReactionCountsAttribute.
+     * Shapes all three reaction types for the frontend.
+     * Access via $image->reactions_summary or append key 'reactions_summary'.
+     */
+    public function getReactionsSummaryAttribute(): array
     {
-        return $this->reactions()
-            ->selectRaw('emoji, COUNT(*) as count')
+        $all = $this->reactions()->get();
+
+        $emoji = $all->where('type', 'emoji')
             ->groupBy('emoji')
-            ->orderByDesc('count')
-            ->pluck('count', 'emoji')
+            ->map(fn($g) => $g->count())
             ->toArray();
+
+        $gifs = $all->where('type', 'gif')
+            ->groupBy('media_url')
+            ->map(fn($g) => [
+                'media_url'    => $g->first()->media_url,
+                'media_label'  => $g->first()->media_label,
+                'media_source' => $g->first()->media_source,
+                'count'        => $g->count(),
+            ])
+            ->values()
+            ->toArray();
+
+        $stickers = $all->where('type', 'sticker')
+            ->groupBy('media_url')
+            ->map(fn($g) => [
+                'media_url'    => $g->first()->media_url,
+                'media_label'  => $g->first()->media_label,
+                'media_source' => $g->first()->media_source,
+                'count'        => $g->count(),
+            ])
+            ->values()
+            ->toArray();
+
+        return compact('emoji', 'gifs', 'stickers');
+    }
+
+    public function getSizeHumanAttribute(): string
+    {
+        $bytes = $this->size ?? 0;
+        if ($bytes === 0) return '0 B';
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $i = min((int) floor(log($bytes) / log(1024)), count($units) - 1);
+        $val = $bytes / pow(1024, $i);
+        return round($val, 2) . ' ' . $units[$i];
     }
 
     public function incrementDownload(): void
     {
         $this->increment('download_count');
-    }
-
-    public function getSizeHumanAttribute(): string
-    {
-        $bytes = $this->size;
-        if ($bytes === 0) return '0 B';
-        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        $i = min(floor(log($bytes) / log(1024)), count($units) - 1);
-        $val = $bytes / pow(1024, $i);
-        return (is_int($val) ? $val : round($val, 2)) . ' ' . $units[$i];
     }
 }

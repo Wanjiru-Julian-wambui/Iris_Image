@@ -13,11 +13,11 @@ class ImageReaction extends Model
     protected $fillable = [
         'image_id',
         'user_id',
-        'type',         // 'emoji' | 'gif' | 'sticker'
-        'emoji',        // set when type = 'emoji'
-        'media_url',    // set when type = 'gif' | 'sticker'
-        'media_label',  // friendly label (GIF title etc.)
-        'media_source', // 'giphy' | 'tenor' | 'upload'
+        'type',
+        'emoji',
+        'media_url',
+        'media_label',
+        'media_source',
         'ip_address',
         'session_fingerprint',
     ];
@@ -32,9 +32,7 @@ class ImageReaction extends Model
         return $this->belongsTo(User::class);
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-
-    public function isEmoji(): bool  { return $this->type === 'emoji';   }
-    public function isGif(): bool    { return $this->type === 'gif';     }
+    public function isEmoji(): bool   { return $this->type === 'emoji';   }
+    public function isGif(): bool     { return $this->type === 'gif';     }
     public function isSticker(): bool { return $this->type === 'sticker'; }
 }
