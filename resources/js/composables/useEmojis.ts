@@ -61,7 +61,7 @@ export function useEmojis() {
         error.value = null;
 
         try {
-            const response = await fetch('/api/emojis', {
+            const response = await fetch('/emojis', {
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
