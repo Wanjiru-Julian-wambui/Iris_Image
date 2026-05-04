@@ -772,7 +772,7 @@ async function loadExif() {
                                         <div class="mt-2 pt-2 border-t border-border">
                                             <input
                                                 type="text"
-                                                maxlength="2"
+                                                maxlength="8"
                                                 placeholder="Paste any emoji & hit Enter…"
                                                 class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none focus:border-violet-500 text-center text-lg"
                                                 @keydown.enter.prevent="(e) => { const emoji = (e.target as HTMLInputElement).value.trim(); if (emoji) reactEmoji(emoji); (e.target as HTMLInputElement).value = ''; }"

@@ -21,7 +21,6 @@ class EmojiController extends Controller
         });
 
         $transformed = array_map(function ($item) {
-            // Convert U+XXXX code points to actual emoji characters
             $emoji = $this->toEmoji($item['unicode'][0] ?? $item['character'] ?? '');
 
             return [
@@ -44,23 +43,17 @@ class EmojiController extends Controller
 
     /**
      * Convert Unicode code point string (U+1F600) to actual emoji character.
+     * Handles single code points and sequences (flags, skin tones).
      */
     private function toEmoji(string $value): string
     {
-        // If it's already an emoji character, return as-is
+        // Already an emoji character
         if (mb_strlen($value) === 1 || preg_match('/\p{So}/u', $value)) {
             return $value;
         }
 
-        // Handle U+XXXX format
-        if (str_starts_with($value, 'U+')) {
-            $hex = substr($value, 2);
-            $codePoint = hexdec($hex);
-            return mb_chr($codePoint, 'UTF-8') ?? '';
-        }
-
-        // Handle multiple code points separated by space (e.g., "U+1F1FA U+1F1F8")
-        if (str_contains($value, 'U+')) {
+        // Handle space-separated multiple code points: "U+1F1FA U+1F1F8"
+        if (str_contains($value, ' ')) {
             $parts = explode(' ', $value);
             $result = '';
             foreach ($parts as $part) {
@@ -75,6 +68,13 @@ class EmojiController extends Controller
                 }
             }
             return $result;
+        }
+
+        // Single code point: "U+1F600"
+        if (str_starts_with($value, 'U+')) {
+            $hex = substr($value, 2);
+            $codePoint = hexdec($hex);
+            return mb_chr($codePoint, 'UTF-8') ?? '';
         }
 
         return $value;

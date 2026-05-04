@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Session;
 
 class ImageReactionController extends Controller
 {
-    private const MAX_EMOJI_LENGTH = 8;
+    private const MAX_EMOJI_LENGTH = 16;
 
     public function store(Request $request, Image $image)
     {
