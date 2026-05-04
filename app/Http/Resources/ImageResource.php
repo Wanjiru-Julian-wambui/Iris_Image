@@ -32,7 +32,7 @@ class ImageResource extends JsonResource
             'alt_text'       => $this->alt_text,
             'created_at'     => $this->created_at->diffForHumans(),
 
-            // Shaped as { emoji: Record<string,number>, gifs: [...], stickers: [...] }
+            // Uses the getReactionsSummaryAttribute accessor from Image model
             // Falls back to empty structure when reactions are not eager-loaded
             'reactions' => $this->whenLoaded(
                 'reactions',

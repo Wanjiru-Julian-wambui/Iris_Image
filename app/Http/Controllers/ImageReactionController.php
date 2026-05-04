@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Image;
+use App\Models\ImageReaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
@@ -11,59 +12,50 @@ class ImageReactionController extends Controller
 {
     private const MAX_EMOJI_LENGTH = 8;
 
-    /**
-     * POST /images/{image}/reactions
-     *
-     * Behaviour:
-     *  - A user/guest may hold ANY NUMBER of distinct reactions on an image
-     *    (multiple different emojis, multiple different GIFs, multiple stickers).
-     *  - Posting the SAME reaction a second time toggles it OFF (removes it).
-     *  - "Same" means: same type + same emoji (for emoji) OR same media_url (for gif/sticker)
-     *    + same user_id (auth) or same ip + fingerprint (guest).
-     */
     public function store(Request $request, Image $image)
     {
-        // Private images: only the owner can react
-        if ($image->is_private && $image->user_id !== auth()->id()) {
-            abort(403, 'Cannot react to a private image.');
-        }
+        abort_if($image->is_private, 403, 'Cannot react to private images.');
 
         $data = $request->validate([
             'type'         => ['required', 'in:emoji,gif,sticker'],
+            // Emoji fields
             'emoji'        => ['required_if:type,emoji', 'nullable', 'string', 'max:' . self::MAX_EMOJI_LENGTH],
+            // GIF / sticker fields
             'media_url'    => ['required_if:type,gif', 'required_if:type,sticker', 'nullable', 'url', 'max:500'],
             'media_label'  => ['nullable', 'string', 'max:100'],
             'media_source' => ['required_if:type,gif', 'required_if:type,sticker', 'nullable', 'in:giphy,upload'],
         ]);
 
-        if ($data['type'] === 'emoji' && !$this->isEmoji($data['emoji'])) {
-            return back()->withErrors(['emoji' => 'Must be a valid emoji.']);
+        // Extra validation for emoji type
+        if ($data['type'] === 'emoji') {
+            if (!$this->isEmoji($data['emoji'])) {
+                return back()->withErrors(['emoji' => 'Must be a valid emoji.']);
+            }
         }
 
+        // For GIF/sticker from external sources, ensure the URL is from an allowed domain
         if (in_array($data['type'], ['gif', 'sticker']) && isset($data['media_url'])) {
-            abort_unless(
-                $this->isAllowedMediaUrl($data['media_url']),
-                422,
-                'Media URL not from an allowed source.'
-            );
+            abort_unless($this->isAllowedMediaUrl($data['media_url']), 422, 'Media URL not from an allowed source.');
         }
 
         $userId      = auth()->id();
         $ip          = $request->ip();
         $fingerprint = $this->getFingerprint($request);
 
-        // ── Toggle: identical reaction already exists → remove it ──────────────
-        // "Identical" = same type + same emoji OR same media_url + same actor.
+        // Build the "identity" key for deduplication
+        $identityKey = $data['type'] === 'emoji'
+            ? $data['emoji']
+            : $data['media_url'];
+
+        // Check if this exact reaction already exists (toggle behaviour)
         $existing = $image->reactions()
             ->where('type', $data['type'])
-            ->when(
-                $data['type'] === 'emoji',
+            ->when($data['type'] === 'emoji',
                 fn($q) => $q->where('emoji', $data['emoji']),
                 fn($q) => $q->where('media_url', $data['media_url'])
             )
-            ->when( $userId,  fn($q) => $q->where('user_id', $userId))
-            ->when(!$userId,  fn($q) => $q->where('ip_address', $ip)
-                                          ->where('session_fingerprint', $fingerprint))
+            ->when($userId,  fn($q) => $q->where('user_id', $userId))
+            ->when(!$userId, fn($q) => $q->where('ip_address', $ip)->where('session_fingerprint', $fingerprint))
             ->first();
 
         if ($existing) {
@@ -71,12 +63,19 @@ class ImageReactionController extends Controller
             return back()->with('success', 'Reaction removed.');
         }
 
-        // ── New reaction — just add it (no "one per type" replacement) ─────────
+        // Remove any previous reaction of the SAME type from this user/guest
+        // (one emoji, one GIF, one sticker per person per image)
+        $image->reactions()
+            ->where('type', $data['type'])
+            ->when($userId,  fn($q) => $q->where('user_id', $userId))
+            ->when(!$userId, fn($q) => $q->where('ip_address', $ip)->where('session_fingerprint', $fingerprint))
+            ->delete();
+
         $image->reactions()->create([
             'type'                => $data['type'],
             'emoji'               => $data['type'] === 'emoji' ? $data['emoji'] : null,
-            'media_url'           => $data['media_url']    ?? null,
-            'media_label'         => $data['media_label']  ?? null,
+            'media_url'           => $data['media_url'] ?? null,
+            'media_label'         => $data['media_label'] ?? null,
             'media_source'        => $data['media_source'] ?? null,
             'user_id'             => $userId,
             'ip_address'          => $ip,
@@ -86,8 +85,11 @@ class ImageReactionController extends Controller
         return back()->with('success', 'Reaction added.');
     }
 
+    // ─── Giphy proxy ─────────────────────────────────────────────────────────
+
     /**
-     * GET /reactions/giphy
+     * Proxy Giphy search so the API key stays server-side.
+     * GET /reactions/giphy?q=cats&offset=0
      */
     public function searchGiphy(Request $request)
     {
@@ -98,7 +100,7 @@ class ImageReactionController extends Controller
         ]);
 
         $apiKey   = config('services.giphy.key');
-        $endpoint = $request->input('type', 'gif') === 'sticker'
+        $endpoint = ($request->input('type', 'gif') === 'sticker')
             ? 'https://api.giphy.com/v1/stickers/search'
             : 'https://api.giphy.com/v1/gifs/search';
 
@@ -114,18 +116,22 @@ class ImageReactionController extends Controller
         return response()->json($response->json());
     }
 
-    // ─── Helpers ──────────────────────────────────────────────────────────────
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private function isAllowedMediaUrl(string $url): bool
     {
         $allowed = [
             'media.giphy.com',
-            'media0.giphy.com', 'media1.giphy.com',
-            'media2.giphy.com', 'media3.giphy.com',
+            'media0.giphy.com',
+            'media1.giphy.com',
+            'media2.giphy.com',
+            'media3.giphy.com',
             'media4.giphy.com',
         ];
 
-        $host      = parse_url($url, PHP_URL_HOST);
+        $host = parse_url($url, PHP_URL_HOST);
+
+        // Also allow the user's own S3/storage domain for uploaded stickers
         $ownDomain = parse_url(config('app.url'), PHP_URL_HOST);
         $allowed[] = $ownDomain;
 
@@ -141,9 +147,15 @@ class ImageReactionController extends Controller
     private function isEmoji(string $value): bool
     {
         $stripped = preg_replace(
-            '/[\x{1F000}-\x{1FFFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}' .
-            '\x{FE00}-\x{FE0F}\x{1F1E0}-\x{1F1FF}\x{200D}\x{20E3}' .
-            '\x{E0020}-\x{E007F}]/u',
+            '/[\x{1F000}-\x{1FFFF}' .
+            '\x{2600}-\x{27BF}'     .
+            '\x{2B00}-\x{2BFF}'     .
+            '\x{FE00}-\x{FE0F}'     .
+            '\x{1F1E0}-\x{1F1FF}'   .
+            '\x{200D}'              .
+            '\x{20E3}'              .
+            '\x{E0020}-\x{E007F}'   .
+            ']/u',
             '',
             $value
         );
@@ -153,6 +165,9 @@ class ImageReactionController extends Controller
 
     private function getFingerprint(Request $request): string
     {
-        return hash('sha256', Session::getId() . substr($request->userAgent() ?? 'unknown', 0, 100));
+        $sessionId = Session::getId();
+        $userAgent = substr($request->userAgent() ?? 'unknown', 0, 100);
+
+        return hash('sha256', $sessionId . $userAgent);
     }
 }

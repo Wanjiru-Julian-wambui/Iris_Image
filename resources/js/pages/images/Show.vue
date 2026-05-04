@@ -197,13 +197,12 @@ type PickerTab = 'emoji' | 'gif' | 'sticker';
 const showPicker     = ref(false);
 const pickerTab      = ref<PickerTab>('emoji');
 const pickerSearch   = ref('');
-const activeCategory = ref(0);
 
 // GIF / sticker search state
 const gifResults     = ref<any[]>([]);
 const stickerResults = ref<any[]>([]);
 const gifLoading     = ref(false);
-const gifOffset      = ref(0);    // Giphy offset
+const gifOffset      = ref(0);
 
 // Per-type "submitting" flag
 const submitting = ref(false);
@@ -212,6 +211,7 @@ const submitting = ref(false);
 
 const reactions = computed(() => {
     const r = props.image.reactions;
+    // Always return valid shape even if backend sends null/undefined
     return {
         emoji:    (r && r.emoji)    ? r.emoji    : {},
         gifs:     (r && r.gifs)     ? r.gifs     : [],
@@ -318,7 +318,6 @@ function onPickerTabChange(tab: PickerTab) {
     pickerSearch.value = '';
     gifResults.value = [];
     stickerResults.value = [];
-    activeCategory.value = 0;
 }
 
 function togglePicker() {
@@ -469,6 +468,26 @@ async function loadExif() {
         }
     }
 }
+
+// ─── Common emojis for picker ───────────────────────────────────────────────
+const COMMON_EMOJIS = [
+    '👍','👎','❤️','🔥','😂','😮','😢','😡','🎉','👏',
+    '🙌','🤔','👀','🚀','💯','⭐','✅','❌','⚡','🌈',
+    '💀','🤡','🫡','🥳','🤯','🫠','🤨','😐','😶','🫥',
+    '😏','😒','🙄','😬','🤥','🤫','🤭','🫢','🫣','🤗',
+    '🥰','😍','😘','🤩','😋','😛','😜','🤪','🤑','🤠',
+    '👻','👽','🤖','💩','🤡','👹','👺','👾','🤡','🎃',
+    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
+    '🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆',
+    '🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋',
+    '🐌','🐞','🐜','🦟','🦗','🕷','🕸','🦂','🐢','🐍',
+    '🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠',
+    '🐟','🐬','🐳','🦈','🐊','🐅','🐆','🦓','🦍','🦧',
+    '🐘','🦛','🦏','🐪','🐫','🦒','🦘','🐃','🐂','🐄',
+    '🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮',
+    '🐕‍🦺','🐈','🐈‍⬛','🐓','🦃','🦚','🦜','🦢','🦩','🕊',
+    '🐇','🦝','🦨','🦡','🦦','🦥','🐁','🐀','🐿','🦔',
+];
 </script>
 
 <template>
@@ -695,46 +714,42 @@ async function loadExif() {
 
                                 <!-- ── Emoji tab ── -->
                                 <template v-if="pickerTab === 'emoji'">
-                                    <!-- Search results -->
-                                    <div v-if="pickerSearch.trim()" class="p-2 max-h-44 overflow-y-auto">
-                                        <div class="flex flex-wrap gap-0.5">
+                                    <div class="p-2 max-h-64 overflow-y-auto">
+                                        <!-- Search results -->
+                                        <div v-if="pickerSearch.trim()" class="flex flex-wrap gap-0.5">
                                             <button
-                                                v-for="emoji in EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => e.includes(pickerSearch.trim()))"
+                                                v-for="emoji in COMMON_EMOJIS.filter(e => e.includes(pickerSearch.trim()))"
                                                 :key="emoji"
                                                 @click="reactEmoji(emoji)"
                                                 :disabled="submitting"
                                                 class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
                                             >{{ emoji }}</button>
                                         </div>
-                                        <p v-if="!EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => e.includes(pickerSearch.trim())).length"
+                                        <p v-if="pickerSearch.trim() && !COMMON_EMOJIS.filter(e => e.includes(pickerSearch.trim())).length"
                                            class="text-xs text-muted-foreground text-center py-3">No results</p>
-                                    </div>
 
-                                    <!-- Category browse -->
-                                    <template v-else>
-                                        <div class="flex overflow-x-auto border-b border-border">
+                                        <!-- Default grid when no search -->
+                                        <div v-if="!pickerSearch.trim()" class="flex flex-wrap gap-0.5">
                                             <button
-                                                v-for="(cat, i) in EMOJI_CATEGORIES"
-                                                :key="i"
-                                                @click="activeCategory = i"
-                                                class="shrink-0 px-2 py-1.5 text-base transition-colors"
-                                                :class="activeCategory === i ? 'bg-violet-500/10' : 'hover:bg-muted'"
-                                                :title="cat.label"
-                                            >{{ cat.emojis[0] }}</button>
+                                                v-for="emoji in COMMON_EMOJIS"
+                                                :key="emoji"
+                                                @click="reactEmoji(emoji)"
+                                                :disabled="submitting"
+                                                class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
+                                            >{{ emoji }}</button>
                                         </div>
-                                        <div class="p-2 max-h-44 overflow-y-auto">
-                                            <p class="text-[10px] text-muted-foreground mb-1.5">{{ EMOJI_CATEGORIES[activeCategory].label }}</p>
-                                            <div class="flex flex-wrap gap-0.5">
-                                                <button
-                                                    v-for="emoji in EMOJI_CATEGORIES[activeCategory].emojis"
-                                                    :key="emoji"
-                                                    @click="reactEmoji(emoji)"
-                                                    :disabled="submitting"
-                                                    class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
-                                                >{{ emoji }}</button>
-                                            </div>
+                                        
+                                        <!-- Native emoji input fallback -->
+                                        <div class="mt-2 pt-2 border-t border-border">
+                                            <input
+                                                type="text"
+                                                maxlength="2"
+                                                placeholder="Paste any emoji & hit Enter…"
+                                                class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none focus:border-violet-500 text-center text-lg"
+                                                @keydown.enter.prevent="(e) => { const emoji = (e.target as HTMLInputElement).value.trim(); if (emoji) reactEmoji(emoji); (e.target as HTMLInputElement).value = ''; }"
+                                            />
                                         </div>
-                                    </template>
+                                    </div>
                                 </template>
 
                                 <!-- ── GIF / Sticker tab ── -->
@@ -944,7 +959,7 @@ async function loadExif() {
                             </form>
 
                             <div v-if="image.notes?.length" class="space-y-2 max-h-72 overflow-y-auto">
-                                <div v-for="note in image.notes" :key="note.id" class="rounded-lg bg-muted/40 p-3 space-y-1.5">
+                                <div v-for="note in image.notes" :key="note.id" class="rounded-lg bg-muted/40 p-3 space-y-1.5 group">
                                     <template v-if="editingNoteId !== note.id">
                                         <div class="flex items-center justify-between">
                                             <div class="flex items-center gap-2">
