@@ -15,6 +15,13 @@ use Inertia\Response;
 
 class ImagePollController extends Controller
 {
+    public function __construct()
+    {
+        // All poll management routes require an authenticated admin.
+        // The public vote/show route is handled separately (no middleware).
+        $this->middleware(['auth', 'admin'])->except(['show', 'vote']);
+    }
+
     public function index(Request $request): Response
     {
         $polls = $request->user()
@@ -71,10 +78,8 @@ class ImagePollController extends Controller
                 'image_b_id' => $data['image_b_id'],
             ]);
         } else {
-            // Multi poll
             $imageIds = array_unique($data['image_ids']);
 
-            // Verify all images belong to the user
             $count = Image::whereIn('id', $imageIds)->where('user_id', $userId)->count();
             abort_unless($count === count($imageIds), 403);
 
@@ -85,7 +90,6 @@ class ImagePollController extends Controller
                     'max_choices' => $data['max_choices'] ?? null,
                 ]);
 
-                // Attach images with sort order
                 $pivot = [];
                 foreach (array_values($imageIds) as $i => $imageId) {
                     $pivot[$imageId] = ['sort_order' => $i];
@@ -167,7 +171,6 @@ class ImagePollController extends Controller
                 'image_ids.*' => ['integer'],
             ]);
 
-            // Validate image_ids belong to this poll
             $validIds = $poll->images()->pluck('images.id')->all();
             $chosen   = array_unique(array_intersect($data['image_ids'], $validIds));
 
@@ -175,7 +178,6 @@ class ImagePollController extends Controller
                 return back()->with('error', 'Please select at least one image.');
             }
 
-            // Respect max_choices limit
             if ($poll->max_choices && count($chosen) > $poll->max_choices) {
                 return back()->with('error', "You can only pick up to {$poll->max_choices} image(s).");
             }

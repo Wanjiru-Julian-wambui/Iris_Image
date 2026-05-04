@@ -34,7 +34,9 @@ class ImageResource extends JsonResource
             'shared_links'       => SharedLinkResource::collection($this->whenLoaded('sharedLinks')),
             'notes'              => ImageNoteResource::collection($this->whenLoaded('notes')),
             'tags'               => TagResource::collection($this->whenLoaded('tags')),
-            'reactions'          => $this->whenCounted('reactions', fn() => $this->reaction_counts),
+            // Use whenLoaded so it works whether reactions are eager-loaded or not.
+            // The model's getReactionCountsAttribute() returns ['emoji' => count, ...]
+            'reactions'          => $this->whenLoaded('reactions', fn() => $this->reaction_counts),
             'versions'           => ImageVersionResource::collection($this->whenLoaded('versions')),
             'user'               => $this->whenLoaded('user', fn() => [
                 'id'   => $this->user->id,

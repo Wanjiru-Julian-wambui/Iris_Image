@@ -190,6 +190,28 @@ function removeTag(tagId: number) {
     });
 }
 
+// ─── Reactions ───────────────────────────────────────────────────────────────
+const EMOJI_PALETTE = ['👍', '❤️', '😍', '😂', '🔥', '👏', '😮', '😢'];
+const reactingEmoji = ref<string | null>(null);
+
+// reactions prop is { emoji: count } from the server
+const reactionEntries = computed<{ emoji: string; count: number }[]>(() => {
+    const r = props.image.reactions as Record<string, number> | null | undefined;
+    if (!r) return [];
+    return Object.entries(r)
+        .map(([emoji, count]) => ({ emoji, count }))
+        .sort((a, b) => b.count - a.count);
+});
+
+function react(emoji: string) {
+    if (reactingEmoji.value) return;
+    reactingEmoji.value = emoji;
+    router.post(`/images/${props.image.id}/reactions`, { emoji }, {
+        preserveScroll: true,
+        onFinish: () => { reactingEmoji.value = null; },
+    });
+}
+
 // ─── Versions ───────────────────────────────────────────────────────────────
 const showReplaceDialog = ref(false);
 const replaceFile = ref<File | null>(null);
@@ -468,6 +490,41 @@ async function loadExif() {
                         <Badge v-if="image.exif_stripped" variant="outline" class="gap-1"><Shield class="h-3 w-3" /> EXIF stripped</Badge>
                     </div>
 
+                    <!-- ── Reactions ──────────────────────────────────────────── -->
+                    <div class="rounded-xl border border-border bg-card p-4 space-y-3">
+                        <h3 class="text-sm font-semibold">Reactions</h3>
+
+                        <!-- Existing reaction counts -->
+                        <div v-if="reactionEntries.length" class="flex flex-wrap gap-2">
+                            <button
+                                v-for="item in reactionEntries"
+                                :key="item.emoji"
+                                @click="react(item.emoji)"
+                                :disabled="!!reactingEmoji"
+                                class="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-sm transition-colors hover:border-violet-500/50 hover:bg-violet-500/10 disabled:opacity-60"
+                            >
+                                <span>{{ item.emoji }}</span>
+                                <span class="text-xs font-medium text-muted-foreground">{{ item.count }}</span>
+                            </button>
+                        </div>
+                        <p v-else class="text-xs text-muted-foreground">No reactions yet — be the first!</p>
+
+                        <!-- Emoji picker palette -->
+                        <div class="flex flex-wrap gap-1.5 pt-1 border-t border-border">
+                            <button
+                                v-for="emoji in EMOJI_PALETTE"
+                                :key="emoji"
+                                @click="react(emoji)"
+                                :disabled="!!reactingEmoji"
+                                class="rounded-lg p-1.5 text-base leading-none transition-colors hover:bg-violet-500/10 disabled:opacity-60"
+                                :class="reactingEmoji === emoji ? 'animate-bounce' : ''"
+                                :title="'React with ' + emoji"
+                            >
+                                {{ emoji }}
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Tags section -->
                     <div class="rounded-xl border border-border bg-card p-4 space-y-3">
                         <div class="flex items-center justify-between">
@@ -730,13 +787,11 @@ async function loadExif() {
                                     <span class="text-xs text-muted-foreground ml-auto">{{ version.size_human }} · {{ version.width }}×{{ version.height }}</span>
                                 </div>
 
-                                <!-- View mode -->
                                 <div v-if="editingVersionId !== version.id">
                                     <p v-if="version.label" class="text-sm font-medium">{{ version.label }}</p>
                                     <p v-if="version.change_note" class="text-xs text-muted-foreground">{{ version.change_note }}</p>
                                 </div>
 
-                                <!-- Edit mode -->
                                 <div v-else class="space-y-2">
                                     <Input v-model="editVersionLabel" placeholder="Version label" class="text-sm h-8" />
                                     <Input v-model="editVersionNote" placeholder="Change note" class="text-sm h-8" />
@@ -796,7 +851,6 @@ async function loadExif() {
                 </DialogHeader>
 
                 <div class="space-y-4 py-2">
-                    <!-- File drop -->
                     <div
                         class="relative rounded-xl border-2 border-dashed border-border p-8 text-center cursor-pointer hover:border-violet-500/50 hover:bg-muted/30 transition-colors"
                         @click="($refs.replaceInput as HTMLInputElement).click()"

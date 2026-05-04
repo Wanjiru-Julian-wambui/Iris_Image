@@ -36,7 +36,6 @@ import type { NavItem } from '@/types';
 const page    = usePage();
 const user    = computed(() => (page.props.auth as any)?.user ?? null);
 const isAdmin = computed(() => user.value?.is_admin === true);
-// Expose the user's current plan so the sidebar badge stays reactive
 const userPlan = computed(() => user.value?.plan ?? null);
 
 const mainNavItems: NavItem[] = [
@@ -48,12 +47,12 @@ const mainNavItems: NavItem[] = [
     { title: 'API Keys',        href: '/settings/api-keys',           icon: Key         },
     { title: 'API Credentials', href: '/settings/api-credentials',    icon: KeyRound    },
     { title: 'Tags',            href: '/tags',                        icon: Tags        },
-    { title: 'Polls',           href: '/polls',                       icon: BarChart3   },
 ];
 
 const adminNavItems: NavItem[] = [
-    { title: 'Admin',       href: '/admin',       icon: Shield },
-    { title: 'Invitations', href: '/invitations', icon: Mail   },
+    { title: 'Polls',       href: '/polls',       icon: BarChart3 },
+    { title: 'Admin',       href: '/admin',       icon: Shield    },
+    { title: 'Invitations', href: '/invitations', icon: Mail      },
 ];
 </script>
 
@@ -74,14 +73,13 @@ const adminNavItems: NavItem[] = [
         <SidebarContent>
             <NavMain :items="mainNavItems" />
 
-            <!-- Plans item with current plan badge — shown separately so badge is visible -->
+            <!-- Plans item with current plan badge -->
             <SidebarMenu class="-mt-1 px-2">
                 <SidebarMenuItem>
                     <SidebarMenuButton as-child>
                         <Link href="/plans" class="flex items-center gap-2 w-full">
                             <CreditCard class="h-4 w-4 shrink-0" />
                             <span class="flex-1">Plans</span>
-                            <!-- Badge hidden when sidebar collapses to icon mode -->
                             <span class="group-data-[collapsible=icon]:hidden">
                                 <PlanBadge :plan="userPlan" size="sm" />
                             </span>
