@@ -13,12 +13,22 @@ class PayPalService
 
     public function __construct()
     {
-        $this->baseUrl  = config('services.paypal.mode') === 'live'
+        $mode = config('services.paypal.mode', 'sandbox');
+
+        $this->baseUrl = $mode === 'live'
             ? 'https://api-m.paypal.com'
             : 'https://api-m.sandbox.paypal.com';
 
-        $this->clientId = config('services.paypal.client_id');
-        $this->secret   = config('services.paypal.secret');
+        $clientId = config('services.paypal.client_id');
+        $secret   = config('services.paypal.secret');
+
+        if (empty($clientId) || empty($secret)) {
+            Log::error('PayPal credentials are not configured. Set PAYPAL_CLIENT_ID and PAYPAL_SECRET in your .env file.');
+            throw new \RuntimeException('PayPal is not configured. Please contact support.');
+        }
+
+        $this->clientId = $clientId;
+        $this->secret   = $secret;
     }
 
     public function getAccessToken(): string

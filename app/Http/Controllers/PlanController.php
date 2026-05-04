@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Services\PayPalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class PlanController extends Controller
@@ -63,9 +64,16 @@ class PlanController extends Controller
             return response()->json(['error' => 'Free plans do not require payment.'], 422);
         }
 
-        $order = $paypal->createOrder($plan->price);
-
-        return response()->json($order);
+        try {
+            $order = $paypal->createOrder($plan->price);
+            return response()->json($order);
+        } catch (\RuntimeException $e) {
+            // Thrown when PayPal credentials are missing/misconfigured
+            return response()->json(['error' => $e->getMessage()], 503);
+        } catch (\Exception $e) {
+            Log::error('PayPal createOrder failed: ' . $e->getMessage());
+            return response()->json(['error' => 'Could not connect to PayPal. Please try again.'], 502);
+        }
     }
 
     /*
@@ -78,7 +86,12 @@ class PlanController extends Controller
     {
         $request->validate(['orderID' => 'required|string']);
 
-        $result = $paypal->captureOrder($request->orderID);
+        try {
+            $result = $paypal->captureOrder($request->orderID);
+        } catch (\Exception $e) {
+            Log::error('PayPal captureOrder failed: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Could not capture payment.'], 502);
+        }
 
         if (isset($result['status']) && $result['status'] === 'COMPLETED') {
             Auth::user()->update(['plan_id' => $plan->id]);
