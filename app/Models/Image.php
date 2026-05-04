@@ -140,8 +140,20 @@ class Image extends Model
 
     // ─── Other Accessors ─────────────────────────────────────────────────────
 
+    /**
+     * Generate and persist a public token if missing.
+     */
+    public function ensurePublicToken(): void
+    {
+        if (empty($this->public_token)) {
+            $this->public_token = Str::random(8);
+            $this->saveQuietly();
+        }
+    }
+
     public function getPublicUrlAttribute(): string
     {
+        $this->ensurePublicToken();
         return url('/i/' . $this->public_token);
     }
 
