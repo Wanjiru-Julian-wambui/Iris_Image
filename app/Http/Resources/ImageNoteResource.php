@@ -13,13 +13,14 @@ class ImageNoteResource extends JsonResource
             'id'         => $this->id,
             'body'       => $this->body,
             'created_at' => $this->created_at->diffForHumans(),
-            'user'       => [
+            'user'       => $this->user ? [
                 'id'     => $this->user->id,
                 'name'   => $this->user->name,
                 'avatar' => $this->user->avatar_url ?? null,
-            ], [
-                'id'   => null,
-                'name' => 'Guest',
+            ] : [
+                'id'     => null,
+                'name'   => 'Guest',
+                'avatar' => null,
             ],
         ];
     }
