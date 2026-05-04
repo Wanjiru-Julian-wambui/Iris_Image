@@ -17,7 +17,6 @@ return new class extends Migration
             $table->string('session_fingerprint', 64)->nullable();
             $table->timestamps();
 
-            // Prevent duplicate reactions per person per emoji per image
             $table->unique(['image_id', 'user_id', 'emoji'], 'reaction_user_unique');
             $table->unique(['image_id', 'ip_address', 'session_fingerprint', 'emoji'], 'reaction_guest_unique');
             $table->index(['image_id', 'emoji']);

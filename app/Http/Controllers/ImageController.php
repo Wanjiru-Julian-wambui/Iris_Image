@@ -61,9 +61,6 @@ class ImageController extends Controller
     {
         abort_unless($image->user_id === auth()->id(), 403);
 
-        // Eager-load everything the Show page needs in one query set.
-        // 'reactions' must be loaded so reactions_summary accessor can group them
-        // without firing additional queries per type.
         $image->load([
             'user',
             'sharedLinks',
@@ -164,10 +161,6 @@ class ImageController extends Controller
         return redirect($image->url);
     }
 
-    /**
-     * POST /images/{image}/replace
-     * Upload a new file as the current image; old file is archived as a version.
-     */
     public function replace(Request $request, Image $image)
     {
         abort_unless($image->user_id === auth()->id(), 403);
@@ -285,7 +278,6 @@ class ImageController extends Controller
             ];
         }
 
-        // Single image — stream as blob so fetch() works with S3 redirects
         if ($images->count() === 1) {
             $image = $images->first();
             $image->incrementDownload();
@@ -315,7 +307,6 @@ class ImageController extends Controller
             ]);
         }
 
-        // Multiple images — zip
         $zipPath = $this->zipService->createFromImages($images, $watermarkOptions);
 
         $images->each->incrementDownload();

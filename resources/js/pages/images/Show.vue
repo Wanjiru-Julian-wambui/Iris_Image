@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Check, Clock, Code, Copy, Download, Eye, Link2, Lock, Share2, Shield, Trash2, Pencil, MessageSquare, X, Send, Tag, Plus, ChevronDown, ChevronUp, Save, History, Upload, RotateCcw, Archive, FileImage } from 'lucide-vue-next';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useExif } from '@/composables/useExif';
+import { useEmojis } from '@/composables/useEmojis';
 import type { BreadcrumbItem } from '@/types';
 
 const props = defineProps<{
@@ -197,6 +198,7 @@ type PickerTab = 'emoji' | 'gif' | 'sticker';
 const showPicker     = ref(false);
 const pickerTab      = ref<PickerTab>('emoji');
 const pickerSearch   = ref('');
+const activeCategory = ref(0);
 
 // GIF / sticker search state
 const gifResults     = ref<any[]>([]);
@@ -207,11 +209,27 @@ const gifOffset      = ref(0);
 // Per-type "submitting" flag
 const submitting = ref(false);
 
+// ── Emoji API integration ──────────────────────────────────────────────────
+const { categories: emojiCategories, loading: emojisLoading, error: emojisError, fetchEmojis, searchEmojis } = useEmojis();
+
+// Fetch emojis when picker opens
+watch(showPicker, (open) => {
+    if (open && emojiCategories.value.length === 0) {
+        fetchEmojis();
+    }
+});
+
+// Computed for emoji search filtering
+const filteredEmojis = computed(() => {
+    const q = pickerSearch.value.trim().toLowerCase();
+    if (!q) return null;
+    return searchEmojis(q);
+});
+
 // ── Computed: what's already reacted ────────────────────────────────────────
 
 const reactions = computed(() => {
     const r = props.image.reactions;
-    // Always return valid shape even if backend sends null/undefined
     return {
         emoji:    (r && r.emoji)    ? r.emoji    : {},
         gifs:     (r && r.gifs)     ? r.gifs     : [],
@@ -293,7 +311,6 @@ async function fetchMedia(reset = false) {
             gifOffset.value += 20;
 
         } else {
-            // Stickers via Giphy stickers endpoint
             const res = await fetch(`/reactions/giphy?q=${encodeURIComponent(q)}&offset=${gifOffset.value}&type=sticker`).then(r => r.json());
             const results: any[] = (res?.data ?? []).map((g: any) => ({
                 id: 'giphy-sticker-' + g.id,
@@ -307,7 +324,7 @@ async function fetchMedia(reset = false) {
             gifOffset.value += 20;
         }
     } catch {
-        // silently fail — search box will just show empty
+        // silently fail
     } finally {
         gifLoading.value = false;
     }
@@ -318,6 +335,7 @@ function onPickerTabChange(tab: PickerTab) {
     pickerSearch.value = '';
     gifResults.value = [];
     stickerResults.value = [];
+    activeCategory.value = 0;
 }
 
 function togglePicker() {
@@ -326,6 +344,7 @@ function togglePicker() {
         pickerSearch.value = '';
         gifResults.value = [];
         stickerResults.value = [];
+        activeCategory.value = 0;
     }
 }
 
@@ -468,26 +487,6 @@ async function loadExif() {
         }
     }
 }
-
-// ─── Common emojis for picker ───────────────────────────────────────────────
-const COMMON_EMOJIS = [
-    '👍','👎','❤️','🔥','😂','😮','😢','😡','🎉','👏',
-    '🙌','🤔','👀','🚀','💯','⭐','✅','❌','⚡','🌈',
-    '💀','🤡','🫡','🥳','🤯','🫠','🤨','😐','😶','🫥',
-    '😏','😒','🙄','😬','🤥','🤫','🤭','🫢','🫣','🤗',
-    '🥰','😍','😘','🤩','😋','😛','😜','🤪','🤑','🤠',
-    '👻','👽','🤖','💩','🤡','👹','👺','👾','🤡','🎃',
-    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
-    '🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆',
-    '🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋',
-    '🐌','🐞','🐜','🦟','🦗','🕷','🕸','🦂','🐢','🐍',
-    '🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠',
-    '🐟','🐬','🐳','🦈','🐊','🐅','🐆','🦓','🦍','🦧',
-    '🐘','🦛','🦏','🐪','🐫','🦒','🦘','🐃','🐂','🐄',
-    '🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮',
-    '🐕‍🦺','🐈','🐈‍⬛','🐓','🦃','🦚','🦜','🦢','🦩','🕊',
-    '🐇','🦝','🦨','🦡','🦦','🦥','🐁','🐀','🐿','🦔',
-];
 </script>
 
 <template>
@@ -715,30 +714,60 @@ const COMMON_EMOJIS = [
                                 <!-- ── Emoji tab ── -->
                                 <template v-if="pickerTab === 'emoji'">
                                     <div class="p-2 max-h-64 overflow-y-auto">
-                                        <!-- Search results -->
-                                        <div v-if="pickerSearch.trim()" class="flex flex-wrap gap-0.5">
-                                            <button
-                                                v-for="emoji in COMMON_EMOJIS.filter(e => e.includes(pickerSearch.trim()))"
-                                                :key="emoji"
-                                                @click="reactEmoji(emoji)"
-                                                :disabled="submitting"
-                                                class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
-                                            >{{ emoji }}</button>
+                                        <!-- Loading -->
+                                        <div v-if="emojisLoading" class="flex justify-center py-6">
+                                            <div class="h-5 w-5 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
                                         </div>
-                                        <p v-if="pickerSearch.trim() && !COMMON_EMOJIS.filter(e => e.includes(pickerSearch.trim())).length"
-                                           class="text-xs text-muted-foreground text-center py-3">No results</p>
 
-                                        <!-- Default grid when no search -->
-                                        <div v-if="!pickerSearch.trim()" class="flex flex-wrap gap-0.5">
-                                            <button
-                                                v-for="emoji in COMMON_EMOJIS"
-                                                :key="emoji"
-                                                @click="reactEmoji(emoji)"
-                                                :disabled="submitting"
-                                                class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
-                                            >{{ emoji }}</button>
+                                        <!-- Error -->
+                                        <div v-else-if="emojisError" class="text-center py-6">
+                                            <p class="text-xs text-muted-foreground">{{ emojisError }}</p>
+                                            <Button size="sm" variant="outline" class="mt-2" @click="fetchEmojis">Retry</Button>
                                         </div>
-                                        
+
+                                        <!-- Empty state -->
+                                        <div v-else-if="emojiCategories.length === 0" class="text-center py-6">
+                                            <p class="text-xs text-muted-foreground">No emojis available</p>
+                                        </div>
+
+                                        <!-- Search results -->
+                                        <div v-else-if="pickerSearch.trim()">
+                                            <div v-if="filteredEmojis && filteredEmojis.length" class="flex flex-wrap gap-0.5">
+                                                <button
+                                                    v-for="item in filteredEmojis"
+                                                    :key="item.emoji"
+                                                    @click="reactEmoji(item.emoji)"
+                                                    :disabled="submitting"
+                                                    class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
+                                                    :title="item.keywords"
+                                                >{{ item.emoji }}</button>
+                                            </div>
+                                            <p v-else class="text-xs text-muted-foreground text-center py-3">No results for "{{ pickerSearch }}"</p>
+                                        </div>
+
+                                        <!-- Category browse -->
+                                        <template v-else>
+                                            <div class="flex overflow-x-auto border-b border-border mb-2">
+                                                <button
+                                                    v-for="(cat, i) in emojiCategories"
+                                                    :key="i"
+                                                    @click="activeCategory = i"
+                                                    class="shrink-0 px-2 py-1.5 text-xs font-medium transition-colors whitespace-nowrap"
+                                                    :class="activeCategory === i ? 'bg-violet-500/10 text-violet-400 border-b-2 border-violet-500' : 'text-muted-foreground hover:bg-muted'"
+                                                >{{ cat.label }}</button>
+                                            </div>
+                                            <div class="flex flex-wrap gap-0.5">
+                                                <button
+                                                    v-for="item in emojiCategories[activeCategory]?.emojis || []"
+                                                    :key="item.emoji"
+                                                    @click="reactEmoji(item.emoji)"
+                                                    :disabled="submitting"
+                                                    class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
+                                                    :title="item.keywords"
+                                                >{{ item.emoji }}</button>
+                                            </div>
+                                        </template>
+
                                         <!-- Native emoji input fallback -->
                                         <div class="mt-2 pt-2 border-t border-border">
                                             <input

@@ -30,6 +30,7 @@ Route::post('/share/{token}', [SharedLinkController::class, 'verify'])->name('sh
 // ─── Public routes (no auth required) ────────────────────────────────────────
 
 Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('public.image');
+Route::get('/api/emojis', [EmojiController::class, 'index'])->name('api.emojis');
 
 // GIF / sticker search proxy — keeps Giphy API key server-side
 Route::get('/reactions/giphy', [ImageReactionController::class, 'searchGiphy'])->name('reactions.giphy');

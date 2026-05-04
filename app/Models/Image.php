@@ -34,7 +34,7 @@ class Image extends Model
     protected $appends = [
         'size_human',
         'public_url',
-        'reactions_summary', // renamed to avoid clashing with reactions() relationship
+        'reactions_summary',
     ];
 
     protected static function boot(): void
@@ -76,7 +76,6 @@ class Image extends Model
         return $this->belongsToMany(Tag::class, 'image_tag');
     }
 
-    // Renamed from reactions() to avoid shadowing the accessor
     public function reactions(): HasMany
     {
         return $this->hasMany(ImageReaction::class);
@@ -162,11 +161,6 @@ class Image extends Model
         return ($this->versions()->max('version_number') ?? 0) + 1;
     }
 
-    /**
-     * Renamed from getReactionCountsAttribute.
-     * Shapes all three reaction types for the frontend.
-     * Access via $image->reactions_summary or append key 'reactions_summary'.
-     */
     public function getReactionsSummaryAttribute(): array
     {
         $all = $this->reactions()->get();

@@ -18,22 +18,18 @@ class ImageReactionController extends Controller
 
         $data = $request->validate([
             'type'         => ['required', 'in:emoji,gif,sticker'],
-            // Emoji fields
             'emoji'        => ['required_if:type,emoji', 'nullable', 'string', 'max:' . self::MAX_EMOJI_LENGTH],
-            // GIF / sticker fields
             'media_url'    => ['required_if:type,gif', 'required_if:type,sticker', 'nullable', 'url', 'max:500'],
             'media_label'  => ['nullable', 'string', 'max:100'],
             'media_source' => ['required_if:type,gif', 'required_if:type,sticker', 'nullable', 'in:giphy,upload'],
         ]);
 
-        // Extra validation for emoji type
         if ($data['type'] === 'emoji') {
             if (!$this->isEmoji($data['emoji'])) {
                 return back()->withErrors(['emoji' => 'Must be a valid emoji.']);
             }
         }
 
-        // For GIF/sticker from external sources, ensure the URL is from an allowed domain
         if (in_array($data['type'], ['gif', 'sticker']) && isset($data['media_url'])) {
             abort_unless($this->isAllowedMediaUrl($data['media_url']), 422, 'Media URL not from an allowed source.');
         }
@@ -42,12 +38,6 @@ class ImageReactionController extends Controller
         $ip          = $request->ip();
         $fingerprint = $this->getFingerprint($request);
 
-        // Build the "identity" key for deduplication
-        $identityKey = $data['type'] === 'emoji'
-            ? $data['emoji']
-            : $data['media_url'];
-
-        // Check if this exact reaction already exists (toggle behaviour)
         $existing = $image->reactions()
             ->where('type', $data['type'])
             ->when($data['type'] === 'emoji',
@@ -63,8 +53,6 @@ class ImageReactionController extends Controller
             return back()->with('success', 'Reaction removed.');
         }
 
-        // Remove any previous reaction of the SAME type from this user/guest
-        // (one emoji, one GIF, one sticker per person per image)
         $image->reactions()
             ->where('type', $data['type'])
             ->when($userId,  fn($q) => $q->where('user_id', $userId))
@@ -85,12 +73,6 @@ class ImageReactionController extends Controller
         return back()->with('success', 'Reaction added.');
     }
 
-    // ─── Giphy proxy ─────────────────────────────────────────────────────────
-
-    /**
-     * Proxy Giphy search so the API key stays server-side.
-     * GET /reactions/giphy?q=cats&offset=0
-     */
     public function searchGiphy(Request $request)
     {
         $request->validate([
@@ -116,8 +98,6 @@ class ImageReactionController extends Controller
         return response()->json($response->json());
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-
     private function isAllowedMediaUrl(string $url): bool
     {
         $allowed = [
@@ -131,7 +111,6 @@ class ImageReactionController extends Controller
 
         $host = parse_url($url, PHP_URL_HOST);
 
-        // Also allow the user's own S3/storage domain for uploaded stickers
         $ownDomain = parse_url(config('app.url'), PHP_URL_HOST);
         $allowed[] = $ownDomain;
 

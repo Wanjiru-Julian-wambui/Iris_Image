@@ -32,8 +32,6 @@ class ImageResource extends JsonResource
             'alt_text'       => $this->alt_text,
             'created_at'     => $this->created_at->diffForHumans(),
 
-            // Uses the getReactionsSummaryAttribute accessor from Image model
-            // Falls back to empty structure when reactions are not eager-loaded
             'reactions' => $this->whenLoaded(
                 'reactions',
                 fn() => $this->reactions_summary,

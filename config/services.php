@@ -45,4 +45,8 @@ return [
         'key' => env('GIPHY_API_KEY'),
     ],
 
+    'rapidapi' => [
+        'key' => env('RAPIDAPI_KEY'),
+    ],
+
 ];
