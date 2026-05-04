@@ -125,57 +125,7 @@ Iris is a **full-stack image hosting SaaS** built on Laravel 13 + Vue 3 + Inerti
 - **Avatar upload** — stored on configured disk (local/R2/S3)
 - **Username** — unique, URL-safe handle
 
-### 🔔 Notifications
-- **Weekly link view digest** — email summary every Monday
-- **Storage quota warnings** — email at 70% and 90% usage
-- **Custom email templates** — admin-editable invite and digest emails
 
-### 🔗 Webhooks & Integrations
-- **Webhooks** — fire on `image.uploaded`, `image.deleted`, `link.viewed`
-- **HMAC-SHA256 signatures** — secure payload verification
-- **Zapier integration** — REST hook triggers for any Zap workflow
-- **Slack notifications** — post upload events to a Slack channel
-- **Discord bot** — `/iris upload` command returns direct image URL
-- **CSV export** — export all image metadata as a spreadsheet
-
-### 🔐 Security & Access
-- **Two-factor authentication** — TOTP via Google Authenticator / Authy
-- **API key management** — scoped keys with abilities and expiry dates
-- **IP allowlist** — restrict access to specific IPs or CIDR ranges
-- **SAML SSO** — enterprise login via Okta, Azure AD, Google Workspace
-- **LDAP / Active Directory** — authenticate against company directory
-- **Custom roles & permissions** — full RBAC beyond admin/user
-- **Invitation-only registration** — admin sends invite tokens
-
-### 🎨 Advanced Image Tools
-- **Watermark on download** — embed text at any position and opacity
-- **Image format converter** — JPG → PNG → WEBP → GIF (GD-based)
-- **Face / region blurring** — pixelate selected areas with GD
-- **Side-by-side comparison** — drag divider to compare two images
-- **Image annotations** — draw arrows, boxes, and text overlays on canvas
-- **Bulk image editor** — adjust brightness, contrast, saturation (Canvas API)
-- **Broken link checker** — find and purge expired shared links
-
-### 🌐 Developer Tools
-- **REST API** — authenticated via Bearer token or API key
-- **CLI tool** — `iris upload ./photo.jpg` returns direct URL
-- **SFTP / FTP upload** — connect any FTP client to upload
-- **WordPress plugin** — sync media library with Iris
-- **Browser extension** — right-click any image → upload to Iris
-
-### ♿ Accessibility & Compliance
-- **Alt text completeness score** — dashboard showing % of images with alt text
-- **Auto-caption suggestions** — AI-generated alt text on upload
-- **Sign language video overlay** — attach video description to public images
-- **NFT metadata export** — OpenSea-compatible JSON at `/nft/{token}/metadata.json`
-- **Blockchain proof of upload** — SHA-256 timestamp hash
-
-### 🏢 Reseller / White-label
-- **Multi-tenant reseller mode** — custom domain, logo, and brand colours per tenant
-- **Custom CSS variables** — `--iris-primary` and `--iris-accent` per tenant
-- **Tenant-scoped data** — reseller users only see their own tenant's data
-
----
 
 ## 🗂️ Project Structure
 
@@ -290,19 +240,6 @@ AWS_DEFAULT_REGION=us-east-1
 AWS_BUCKET=iris-images
 ```
 
-### CDN / Image processing
-```env
-# Imgix (serves images from R2 with transforms)
-IMGIX_ENABLED=true
-IMGIX_DOMAIN=your-source.imgix.net
-IMGIX_SIGN_URLS=false
-
-# Cloudinary (upload-time processing)
-CLOUDINARY_ENABLED=false
-CLOUDINARY_CLOUD_NAME=your_cloud
-CLOUDINARY_API_KEY=your_key
-CLOUDINARY_API_SECRET=your_secret
-```
 
 ### Recommended production setup
 ```env
