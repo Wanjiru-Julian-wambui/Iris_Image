@@ -30,6 +30,8 @@ Route::post('/share/{token}', [SharedLinkController::class, 'verify'])->name('sh
 // Public routes (no auth required)
 Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('public.image');
 Route::post('/i/{image}/react', [ImageReactionController::class, 'store'])->name('images.react');
+// GIF / sticker search proxy (keeps API key server-side)
+Route::get('/reactions/giphy', [ImageReactionController::class, 'searchGiphy']);
 Route::get('/poll/{token}', [ImagePollController::class, 'show'])->name('polls.show');
 Route::post('/poll/{token}/vote', [ImagePollController::class, 'vote'])->name('polls.vote');
 

@@ -41,4 +41,8 @@ return [
         'secret'    => env('PAYPAL_SECRET'),
     ],
 
+    'giphy' => [
+        'key' => env('GIPHY_API_KEY'),
+    ],
+
 ];

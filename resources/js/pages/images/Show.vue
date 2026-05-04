@@ -191,80 +191,139 @@ function removeTag(tagId: number) {
 }
 
 // ─── Reactions ───────────────────────────────────────────────────────────────
-const reactingEmoji  = ref<string | null>(null);
+
+// Picker tab: 'emoji' | 'gif' | 'sticker'
+type PickerTab = 'emoji' | 'gif' | 'sticker';
 const showPicker     = ref(false);
+const pickerTab      = ref<PickerTab>('emoji');
 const pickerSearch   = ref('');
 const activeCategory = ref(0);
 
-// reactions prop is { emoji: count } from the server
-const reactionEntries = computed<{ emoji: string; count: number }[]>(() => {
-    const r = props.image.reactions as Record<string, number> | null | undefined;
-    if (!r) return [];
-    return Object.entries(r)
-        .map(([emoji, count]) => ({ emoji, count }))
-        .sort((a, b) => b.count - a.count);
+// GIF / sticker search state
+const gifResults     = ref<any[]>([]);
+const stickerResults = ref<any[]>([]);
+const gifLoading     = ref(false);
+const gifOffset      = ref(0);    // Giphy offset
+
+// Per-type "submitting" flag
+const submitting = ref(false);
+
+// ── Computed: what's already reacted ────────────────────────────────────────
+
+const reactions = computed(() => {
+    return (props.image.reactions ?? { emoji: {}, gifs: [], stickers: [] }) as {
+        emoji: Record<string, number>;
+        gifs: { media_url: string; media_label: string | null; media_source: string; count: number }[];
+        stickers: { media_url: string; media_label: string | null; media_source: string; count: number }[];
+    };
 });
 
-function react(emoji: string) {
-    if (reactingEmoji.value) return;
-    reactingEmoji.value = emoji;
+const emojiEntries = computed(() =>
+    Object.entries(reactions.value.emoji)
+        .map(([emoji, count]) => ({ emoji, count }))
+        .sort((a, b) => b.count - a.count)
+);
+
+const hasAnyReaction = computed(() =>
+    emojiEntries.value.length > 0 ||
+    reactions.value.gifs.length > 0 ||
+    reactions.value.stickers.length > 0
+);
+
+// ── React functions ──────────────────────────────────────────────────────────
+
+function reactEmoji(emoji: string) {
+    if (submitting.value) return;
+    submitting.value = true;
     showPicker.value = false;
-    pickerSearch.value = '';
-    router.post(`/images/${props.image.id}/reactions`, { emoji }, {
+    router.post(`/images/${props.image.id}/reactions`, {
+        type: 'emoji', emoji,
+    }, {
         preserveScroll: true,
-        onFinish: () => { reactingEmoji.value = null; },
+        onFinish: () => { submitting.value = false; },
     });
 }
 
-// Full categorised emoji set
-const EMOJI_CATEGORIES = [
-    {
-        label: '😀 Smileys',
-        emojis: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','💫','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖'],
-    },
-    {
-        label: '👋 People',
-        emojis: ['👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🫀','🫁','🧠','🦷','🦴','👀','👁️','👅','👄','💋','🩸'],
-    },
-    {
-        label: '❤️ Hearts',
-        emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️','✝️','☪️','🕉️','✡️','🔯','🕎','☯️','☦️','🛐','⛎','♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'],
-    },
-    {
-        label: '🐶 Animals',
-        emojis: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🐤','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🦟','🦗','🕷️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆','🦓','🦍','🦧','🦣','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺','🐈','🐈‍⬛','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔'],
-    },
-    {
-        label: '🍕 Food',
-        emojis: ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🧄','🧅','🥔','🍠','🫘','🌰','🥜','🍞','🥐','🥖','🫓','🥨','🧀','🥚','🍳','🧈','🥞','🧇','🥓','🥩','🍗','🍖','🦴','🌭','🍔','🍟','🍕','🫔','🌮','🌯','🥙','🧆','🥚','🥗','🥘','🫕','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍘','🍥','🥮','🍢','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪','🌰','🥜','🍯','🧃','🥤','🧋','☕','🫖','🍵','🧉','🍺','🍻','🥂','🍷','🥃','🍸','🍹','🧊','🥄','🍴','🍽️'],
-    },
-    {
-        label: '🌍 Travel',
-        emojis: ['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🏍️','🛵','🛺','🚲','🛴','🛹','🛼','🚏','🛣️','🛤️','⛽','🛞','🚨','🚥','🚦','🛑','🚧','⚓','🛟','⛵','🚤','🛥️','🛳️','⛴️','🚢','✈️','🛩️','🛫','🛬','🪂','💺','🚁','🚟','🚠','🚡','🛰️','🚀','🛸','🌍','🌎','🌏','🌐','🗺️','🗾','🧭','🏔️','⛰️','🌋','🗻','🏕️','🏖️','🏜️','🏝️','🏞️','🏟️','🏛️','🏗️','🧱','🪨','🪵','🛖','🏘️','🏚️','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏯','🏰','💒','🗼','🗽','⛪','🕌','🛕','🕍','⛩️','🕋'],
-    },
-    {
-        label: '⚽ Activities',
-        emojis: ['⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱','🏓','🏸','🏒','🏑','🥍','🏏','🪃','🥅','⛳','🪁','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛼','🛷','⛸️','🥌','🎿','⛷️','🏂','🪂','🏋️','🤼','🤸','⛹️','🤺','🏇','🧘','🏄','🏊','🤽','🚣','🧗','🚵','🚴','🏆','🥇','🥈','🥉','🏅','🎖️','🏵️','🎗️','🎫','🎟️','🎪','🤹','🎭','🩰','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🪘','🎷','🎺','🎸','🪕','🎻','🪗','🎲','♟️','🎯','🎳','🎮','🎰','🧩'],
-    },
-    {
-        label: '🔥 Symbols',
-        emojis: ['🔥','✨','💥','💫','⭐','🌟','💢','💦','💨','🕳️','💬','💭','🗯️','💤','💮','♨️','💈','🛑','🚫','📵','🔞','⛔','❌','⭕','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔶','🔷','🔸','🔹','🔺','🔻','💠','🔘','🔲','🔳','▪️','▫️','◾','◽','◼️','◻️','🟥','🟧','🟨','🟩','🟦','🟪','⬛','⬜','🟫','🔈','🔉','🔊','📢','📣','🔔','🔕','🎵','🎶','💯','🔑','🗝️','🔐','🔏','🔒','🔓','🔨','🪓','⛏️','⚒️','🛠️','🗡️','⚔️','🛡️','🔧','🔩','⚙️','🗜️','⚖️','🦯','🔗','⛓️','🧲','🪜'],
-    },
-] as const;
-
-const filteredCategories = computed(() => {
-    const q = pickerSearch.value.trim().toLowerCase();
-    if (!q) return EMOJI_CATEGORIES;
-    // Simple filter: return a single pseudo-category with matching emojis
-    const all = EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => {
-        // Basic: include if the emoji itself or its codepoint description could match
-        // Since we don't have names, just do a text search over the category labels too
-        return true; // fallback: show all when searching (user sees what they type)
+function reactMedia(type: 'gif' | 'sticker', media_url: string, media_label: string | null, media_source: string) {
+    if (submitting.value) return;
+    submitting.value = true;
+    showPicker.value = false;
+    router.post(`/images/${props.image.id}/reactions`, {
+        type, media_url, media_label, media_source,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { submitting.value = false; },
     });
-    // We can't do real name search without a lookup table, so just show all on search
-    // and let users find by scrolling — the search box still helps by keeping focus.
-    return EMOJI_CATEGORIES;
-});
+}
+
+// ── GIF / Sticker search ─────────────────────────────────────────────────────
+
+let searchDebounce: ReturnType<typeof setTimeout> | null = null;
+
+function onPickerSearchInput() {
+    if (pickerTab.value === 'emoji') return;
+    if (searchDebounce) clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => fetchMedia(true), 400);
+}
+
+async function fetchMedia(reset = false) {
+    const q = pickerSearch.value.trim();
+    if (!q) { gifResults.value = []; stickerResults.value = []; return; }
+
+    gifLoading.value = true;
+    if (reset) { gifOffset.value = 0; gifResults.value = []; stickerResults.value = []; }
+
+    try {
+        if (pickerTab.value === 'gif') {
+            const res = await fetch(`/reactions/giphy?q=${encodeURIComponent(q)}&offset=${gifOffset.value}&type=gif`).then(r => r.json());
+            const results: any[] = (res?.data ?? []).map((g: any) => ({
+                id: 'giphy-' + g.id,
+                url: g.images?.fixed_height_small?.url ?? g.images?.downsized?.url,
+                original_url: g.images?.original?.url,
+                label: g.title,
+                source: 'giphy',
+            }));
+
+            gifResults.value = reset ? results : [...gifResults.value, ...results];
+            gifOffset.value += 20;
+
+        } else {
+            // Stickers via Giphy stickers endpoint
+            const res = await fetch(`/reactions/giphy?q=${encodeURIComponent(q)}&offset=${gifOffset.value}&type=sticker`).then(r => r.json());
+            const results: any[] = (res?.data ?? []).map((g: any) => ({
+                id: 'giphy-sticker-' + g.id,
+                url: g.images?.fixed_height_small?.url ?? g.images?.downsized?.url,
+                original_url: g.images?.original?.url,
+                label: g.title,
+                source: 'giphy',
+            }));
+
+            stickerResults.value = reset ? results : [...stickerResults.value, ...results];
+            gifOffset.value += 20;
+        }
+    } catch {
+        // silently fail — search box will just show empty
+    } finally {
+        gifLoading.value = false;
+    }
+}
+
+function onPickerTabChange(tab: PickerTab) {
+    pickerTab.value = tab;
+    pickerSearch.value = '';
+    gifResults.value = [];
+    stickerResults.value = [];
+    activeCategory.value = 0;
+}
+
+function togglePicker() {
+    showPicker.value = !showPicker.value;
+    if (!showPicker.value) {
+        pickerSearch.value = '';
+        gifResults.value = [];
+        stickerResults.value = [];
+    }
+}
 
 // ─── Versions ───────────────────────────────────────────────────────────────
 const showReplaceDialog = ref(false);
@@ -548,86 +607,173 @@ async function loadExif() {
                     <div class="rounded-xl border border-border bg-card p-4 space-y-3">
                         <h3 class="text-sm font-semibold">Reactions</h3>
 
-                        <!-- Existing reaction counts -->
-                        <div v-if="reactionEntries.length" class="flex flex-wrap gap-2">
+                        <!-- Existing emoji reactions -->
+                        <div v-if="emojiEntries.length" class="flex flex-wrap gap-2">
                             <button
-                                v-for="item in reactionEntries"
+                                v-for="item in emojiEntries"
                                 :key="item.emoji"
-                                @click="react(item.emoji)"
-                                :disabled="!!reactingEmoji"
+                                @click="reactEmoji(item.emoji)"
+                                :disabled="submitting"
                                 class="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-sm transition-colors hover:border-violet-500/50 hover:bg-violet-500/10 disabled:opacity-60"
                             >
                                 <span>{{ item.emoji }}</span>
                                 <span class="text-xs font-medium text-muted-foreground">{{ item.count }}</span>
                             </button>
                         </div>
-                        <p v-else class="text-xs text-muted-foreground">No reactions yet — be the first!</p>
 
-                        <!-- Add reaction button + picker -->
+                        <!-- GIF reactions -->
+                        <div v-if="reactions.gifs.length" class="flex flex-wrap gap-2">
+                            <button
+                                v-for="gif in reactions.gifs"
+                                :key="gif.media_url"
+                                @click="reactMedia('gif', gif.media_url, gif.media_label, gif.media_source)"
+                                :disabled="submitting"
+                                class="relative rounded-lg overflow-hidden border border-border hover:border-violet-500/50 transition-colors disabled:opacity-60"
+                                :title="gif.media_label ?? 'GIF'"
+                            >
+                                <img :src="gif.media_url" class="h-12 w-auto object-cover" />
+                                <span class="absolute bottom-0.5 right-1 text-[10px] font-bold text-white drop-shadow">{{ gif.count }}</span>
+                            </button>
+                        </div>
+
+                        <!-- Sticker reactions -->
+                        <div v-if="reactions.stickers.length" class="flex flex-wrap gap-2">
+                            <button
+                                v-for="sticker in reactions.stickers"
+                                :key="sticker.media_url"
+                                @click="reactMedia('sticker', sticker.media_url, sticker.media_label, sticker.media_source)"
+                                :disabled="submitting"
+                                class="relative rounded-lg overflow-hidden border border-border hover:border-violet-500/50 transition-colors disabled:opacity-60"
+                                :title="sticker.media_label ?? 'Sticker'"
+                            >
+                                <img :src="sticker.media_url" class="h-12 w-auto object-cover" />
+                                <span class="absolute bottom-0.5 right-1 text-[10px] font-bold text-white drop-shadow">{{ sticker.count }}</span>
+                            </button>
+                        </div>
+
+                        <p v-if="!hasAnyReaction" class="text-xs text-muted-foreground">No reactions yet — be the first!</p>
+
+                        <!-- Add reaction trigger -->
                         <div class="pt-1 border-t border-border">
                             <button
-                                @click="showPicker = !showPicker"
+                                @click="togglePicker"
                                 class="flex items-center gap-1.5 rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-violet-500/50 hover:text-violet-400"
                             >
                                 <span class="text-base leading-none">😀</span>
                                 <span class="text-xs">{{ showPicker ? 'Close' : 'Add reaction' }}</span>
                             </button>
 
-                            <!-- Full picker dropdown -->
+                            <!-- Picker panel -->
                             <div v-if="showPicker" class="mt-2 rounded-xl border border-border bg-popover shadow-lg overflow-hidden">
-                                <!-- Search -->
+
+                                <!-- Tab bar: Emoji / GIF / Sticker -->
+                                <div class="flex border-b border-border text-xs font-medium">
+                                    <button
+                                        v-for="tab in (['emoji', 'gif', 'sticker'] as const)"
+                                        :key="tab"
+                                        @click="onPickerTabChange(tab)"
+                                        class="flex-1 py-2 capitalize transition-colors"
+                                        :class="pickerTab === tab ? 'bg-violet-500/10 text-violet-400 border-b-2 border-violet-500' : 'text-muted-foreground hover:bg-muted'"
+                                    >{{ tab === 'gif' ? 'GIF' : tab === 'sticker' ? 'Sticker' : 'Emoji' }}</button>
+                                </div>
+
+                                <!-- Search bar (all tabs) -->
                                 <div class="p-2 border-b border-border">
                                     <input
                                         v-model="pickerSearch"
-                                        placeholder="Search emoji…"
+                                        :placeholder="pickerTab === 'emoji' ? 'Search emoji…' : pickerTab === 'gif' ? 'Search GIFs…' : 'Search stickers…'"
                                         class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none focus:border-violet-500"
+                                        @input="onPickerSearchInput"
                                         autofocus
                                     />
                                 </div>
 
-                                <!-- Search results -->
-                                <div v-if="pickerSearch.trim()" class="p-2 max-h-40 overflow-y-auto">
-                                    <div class="flex flex-wrap gap-1">
-                                        <button
-                                            v-for="emoji in EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => e.includes(pickerSearch.trim()))"
-                                            :key="emoji"
-                                            @click="react(emoji)"
-                                            :disabled="!!reactingEmoji"
-                                            class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
-                                        >{{ emoji }}</button>
-                                    </div>
-                                    <p v-if="!EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => e.includes(pickerSearch.trim())).length"
-                                       class="text-xs text-muted-foreground text-center py-3">No results</p>
-                                </div>
-
-                                <!-- Categorised grid -->
-                                <template v-else>
-                                    <!-- Category tabs -->
-                                    <div class="flex overflow-x-auto border-b border-border">
-                                        <button
-                                            v-for="(cat, i) in EMOJI_CATEGORIES"
-                                            :key="i"
-                                            @click="activeCategory = i"
-                                            class="shrink-0 px-2 py-1.5 text-base transition-colors"
-                                            :class="activeCategory === i ? 'bg-violet-500/10' : 'hover:bg-muted'"
-                                            :title="cat.label"
-                                        >{{ cat.emojis[0] }}</button>
-                                    </div>
-                                    <!-- Emoji grid -->
-                                    <div class="p-2 max-h-44 overflow-y-auto">
-                                        <p class="text-[10px] text-muted-foreground mb-1.5">{{ EMOJI_CATEGORIES[activeCategory].label }}</p>
+                                <!-- ── Emoji tab ── -->
+                                <template v-if="pickerTab === 'emoji'">
+                                    <!-- Search results -->
+                                    <div v-if="pickerSearch.trim()" class="p-2 max-h-44 overflow-y-auto">
                                         <div class="flex flex-wrap gap-0.5">
                                             <button
-                                                v-for="emoji in EMOJI_CATEGORIES[activeCategory].emojis"
+                                                v-for="emoji in EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => e.includes(pickerSearch.trim()))"
                                                 :key="emoji"
-                                                @click="react(emoji)"
-                                                :disabled="!!reactingEmoji"
+                                                @click="reactEmoji(emoji)"
+                                                :disabled="submitting"
                                                 class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
-                                                :class="reactingEmoji === emoji ? 'animate-bounce' : ''"
                                             >{{ emoji }}</button>
                                         </div>
+                                        <p v-if="!EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => e.includes(pickerSearch.trim())).length"
+                                           class="text-xs text-muted-foreground text-center py-3">No results</p>
+                                    </div>
+
+                                    <!-- Category browse -->
+                                    <template v-else>
+                                        <div class="flex overflow-x-auto border-b border-border">
+                                            <button
+                                                v-for="(cat, i) in EMOJI_CATEGORIES"
+                                                :key="i"
+                                                @click="activeCategory = i"
+                                                class="shrink-0 px-2 py-1.5 text-base transition-colors"
+                                                :class="activeCategory === i ? 'bg-violet-500/10' : 'hover:bg-muted'"
+                                                :title="cat.label"
+                                            >{{ cat.emojis[0] }}</button>
+                                        </div>
+                                        <div class="p-2 max-h-44 overflow-y-auto">
+                                            <p class="text-[10px] text-muted-foreground mb-1.5">{{ EMOJI_CATEGORIES[activeCategory].label }}</p>
+                                            <div class="flex flex-wrap gap-0.5">
+                                                <button
+                                                    v-for="emoji in EMOJI_CATEGORIES[activeCategory].emojis"
+                                                    :key="emoji"
+                                                    @click="reactEmoji(emoji)"
+                                                    :disabled="submitting"
+                                                    class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
+                                                >{{ emoji }}</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </template>
+
+                                <!-- ── GIF / Sticker tab ── -->
+                                <template v-else>
+                                    <div class="p-2 max-h-64 overflow-y-auto">
+                                        <!-- Prompt when no search yet -->
+                                        <p v-if="!pickerSearch.trim() && !gifLoading" class="text-xs text-muted-foreground text-center py-6">
+                                            {{ pickerTab === 'gif' ? 'Type to search GIFs from Giphy' : 'Type to search stickers from Giphy' }}
+                                        </p>
+
+                                        <!-- Loading -->
+                                        <div v-else-if="gifLoading && (pickerTab === 'gif' ? gifResults : stickerResults).length === 0"
+                                             class="flex justify-center py-6">
+                                            <div class="h-5 w-5 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+                                        </div>
+
+                                        <!-- Results grid -->
+                                        <div v-else class="grid grid-cols-3 gap-1.5">
+                                            <button
+                                                v-for="item in (pickerTab === 'gif' ? gifResults : stickerResults)"
+                                                :key="item.id"
+                                                @click="reactMedia(pickerTab as 'gif' | 'sticker', item.original_url, item.label, item.source)"
+                                                :disabled="submitting"
+                                                class="relative rounded-lg overflow-hidden border border-border hover:border-violet-500/50 transition-colors disabled:opacity-60 aspect-video bg-muted"
+                                                :title="item.label"
+                                            >
+                                                <img :src="item.url" class="w-full h-full object-cover" loading="lazy" />
+                                            </button>
+
+                                            <!-- Empty -->
+                                            <p v-if="!gifLoading && (pickerTab === 'gif' ? gifResults : stickerResults).length === 0 && pickerSearch.trim()"
+                                               class="col-span-3 text-xs text-muted-foreground text-center py-4">No results for "{{ pickerSearch }}"</p>
+                                        </div>
+
+                                        <!-- Load more -->
+                                        <button
+                                            v-if="(pickerTab === 'gif' ? gifResults : stickerResults).length > 0"
+                                            @click="fetchMedia(false)"
+                                            :disabled="gifLoading"
+                                            class="mt-2 w-full text-xs text-muted-foreground hover:text-violet-400 transition-colors py-1 disabled:opacity-50"
+                                        >{{ gifLoading ? 'Loading…' : 'Load more' }}</button>
                                     </div>
                                 </template>
+
                             </div>
                         </div>
                     </div>
