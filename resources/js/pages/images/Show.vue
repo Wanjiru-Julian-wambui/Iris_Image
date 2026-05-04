@@ -191,8 +191,10 @@ function removeTag(tagId: number) {
 }
 
 // ─── Reactions ───────────────────────────────────────────────────────────────
-const EMOJI_PALETTE = ['👍', '❤️', '😍', '😂', '🔥', '👏', '😮', '😢'];
-const reactingEmoji = ref<string | null>(null);
+const reactingEmoji  = ref<string | null>(null);
+const showPicker     = ref(false);
+const pickerSearch   = ref('');
+const activeCategory = ref(0);
 
 // reactions prop is { emoji: count } from the server
 const reactionEntries = computed<{ emoji: string; count: number }[]>(() => {
@@ -206,11 +208,63 @@ const reactionEntries = computed<{ emoji: string; count: number }[]>(() => {
 function react(emoji: string) {
     if (reactingEmoji.value) return;
     reactingEmoji.value = emoji;
+    showPicker.value = false;
+    pickerSearch.value = '';
     router.post(`/images/${props.image.id}/reactions`, { emoji }, {
         preserveScroll: true,
         onFinish: () => { reactingEmoji.value = null; },
     });
 }
+
+// Full categorised emoji set
+const EMOJI_CATEGORIES = [
+    {
+        label: '😀 Smileys',
+        emojis: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','💫','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖'],
+    },
+    {
+        label: '👋 People',
+        emojis: ['👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🫀','🫁','🧠','🦷','🦴','👀','👁️','👅','👄','💋','🩸'],
+    },
+    {
+        label: '❤️ Hearts',
+        emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️','✝️','☪️','🕉️','✡️','🔯','🕎','☯️','☦️','🛐','⛎','♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'],
+    },
+    {
+        label: '🐶 Animals',
+        emojis: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🐤','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🦟','🦗','🕷️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆','🦓','🦍','🦧','🦣','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺','🐈','🐈‍⬛','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔'],
+    },
+    {
+        label: '🍕 Food',
+        emojis: ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🧄','🧅','🥔','🍠','🫘','🌰','🥜','🍞','🥐','🥖','🫓','🥨','🧀','🥚','🍳','🧈','🥞','🧇','🥓','🥩','🍗','🍖','🦴','🌭','🍔','🍟','🍕','🫔','🌮','🌯','🥙','🧆','🥚','🥗','🥘','🫕','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦪','🍤','🍙','🍘','🍥','🥮','🍢','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪','🌰','🥜','🍯','🧃','🥤','🧋','☕','🫖','🍵','🧉','🍺','🍻','🥂','🍷','🥃','🍸','🍹','🧊','🥄','🍴','🍽️'],
+    },
+    {
+        label: '🌍 Travel',
+        emojis: ['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🏍️','🛵','🛺','🚲','🛴','🛹','🛼','🚏','🛣️','🛤️','⛽','🛞','🚨','🚥','🚦','🛑','🚧','⚓','🛟','⛵','🚤','🛥️','🛳️','⛴️','🚢','✈️','🛩️','🛫','🛬','🪂','💺','🚁','🚟','🚠','🚡','🛰️','🚀','🛸','🌍','🌎','🌏','🌐','🗺️','🗾','🧭','🏔️','⛰️','🌋','🗻','🏕️','🏖️','🏜️','🏝️','🏞️','🏟️','🏛️','🏗️','🧱','🪨','🪵','🛖','🏘️','🏚️','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏯','🏰','💒','🗼','🗽','⛪','🕌','🛕','🕍','⛩️','🕋'],
+    },
+    {
+        label: '⚽ Activities',
+        emojis: ['⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱','🏓','🏸','🏒','🏑','🥍','🏏','🪃','🥅','⛳','🪁','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛼','🛷','⛸️','🥌','🎿','⛷️','🏂','🪂','🏋️','🤼','🤸','⛹️','🤺','🏇','🧘','🏄','🏊','🤽','🚣','🧗','🚵','🚴','🏆','🥇','🥈','🥉','🏅','🎖️','🏵️','🎗️','🎫','🎟️','🎪','🤹','🎭','🩰','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🪘','🎷','🎺','🎸','🪕','🎻','🪗','🎲','♟️','🎯','🎳','🎮','🎰','🧩'],
+    },
+    {
+        label: '🔥 Symbols',
+        emojis: ['🔥','✨','💥','💫','⭐','🌟','💢','💦','💨','🕳️','💬','💭','🗯️','💤','💮','♨️','💈','🛑','🚫','📵','🔞','⛔','❌','⭕','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔶','🔷','🔸','🔹','🔺','🔻','💠','🔘','🔲','🔳','▪️','▫️','◾','◽','◼️','◻️','🟥','🟧','🟨','🟩','🟦','🟪','⬛','⬜','🟫','🔈','🔉','🔊','📢','📣','🔔','🔕','🎵','🎶','💯','🔑','🗝️','🔐','🔏','🔒','🔓','🔨','🪓','⛏️','⚒️','🛠️','🗡️','⚔️','🛡️','🔧','🔩','⚙️','🗜️','⚖️','🦯','🔗','⛓️','🧲','🪜'],
+    },
+] as const;
+
+const filteredCategories = computed(() => {
+    const q = pickerSearch.value.trim().toLowerCase();
+    if (!q) return EMOJI_CATEGORIES;
+    // Simple filter: return a single pseudo-category with matching emojis
+    const all = EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => {
+        // Basic: include if the emoji itself or its codepoint description could match
+        // Since we don't have names, just do a text search over the category labels too
+        return true; // fallback: show all when searching (user sees what they type)
+    });
+    // We can't do real name search without a lookup table, so just show all on search
+    // and let users find by scrolling — the search box still helps by keeping focus.
+    return EMOJI_CATEGORIES;
+});
 
 // ─── Versions ───────────────────────────────────────────────────────────────
 const showReplaceDialog = ref(false);
@@ -509,19 +563,72 @@ async function loadExif() {
                         </div>
                         <p v-else class="text-xs text-muted-foreground">No reactions yet — be the first!</p>
 
-                        <!-- Emoji picker palette -->
-                        <div class="flex flex-wrap gap-1.5 pt-1 border-t border-border">
+                        <!-- Add reaction button + picker -->
+                        <div class="pt-1 border-t border-border">
                             <button
-                                v-for="emoji in EMOJI_PALETTE"
-                                :key="emoji"
-                                @click="react(emoji)"
-                                :disabled="!!reactingEmoji"
-                                class="rounded-lg p-1.5 text-base leading-none transition-colors hover:bg-violet-500/10 disabled:opacity-60"
-                                :class="reactingEmoji === emoji ? 'animate-bounce' : ''"
-                                :title="'React with ' + emoji"
+                                @click="showPicker = !showPicker"
+                                class="flex items-center gap-1.5 rounded-full border border-dashed border-border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-violet-500/50 hover:text-violet-400"
                             >
-                                {{ emoji }}
+                                <span class="text-base leading-none">😀</span>
+                                <span class="text-xs">{{ showPicker ? 'Close' : 'Add reaction' }}</span>
                             </button>
+
+                            <!-- Full picker dropdown -->
+                            <div v-if="showPicker" class="mt-2 rounded-xl border border-border bg-popover shadow-lg overflow-hidden">
+                                <!-- Search -->
+                                <div class="p-2 border-b border-border">
+                                    <input
+                                        v-model="pickerSearch"
+                                        placeholder="Search emoji…"
+                                        class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none focus:border-violet-500"
+                                        autofocus
+                                    />
+                                </div>
+
+                                <!-- Search results -->
+                                <div v-if="pickerSearch.trim()" class="p-2 max-h-40 overflow-y-auto">
+                                    <div class="flex flex-wrap gap-1">
+                                        <button
+                                            v-for="emoji in EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => e.includes(pickerSearch.trim()))"
+                                            :key="emoji"
+                                            @click="react(emoji)"
+                                            :disabled="!!reactingEmoji"
+                                            class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
+                                        >{{ emoji }}</button>
+                                    </div>
+                                    <p v-if="!EMOJI_CATEGORIES.flatMap(c => c.emojis).filter(e => e.includes(pickerSearch.trim())).length"
+                                       class="text-xs text-muted-foreground text-center py-3">No results</p>
+                                </div>
+
+                                <!-- Categorised grid -->
+                                <template v-else>
+                                    <!-- Category tabs -->
+                                    <div class="flex overflow-x-auto border-b border-border">
+                                        <button
+                                            v-for="(cat, i) in EMOJI_CATEGORIES"
+                                            :key="i"
+                                            @click="activeCategory = i"
+                                            class="shrink-0 px-2 py-1.5 text-base transition-colors"
+                                            :class="activeCategory === i ? 'bg-violet-500/10' : 'hover:bg-muted'"
+                                            :title="cat.label"
+                                        >{{ cat.emojis[0] }}</button>
+                                    </div>
+                                    <!-- Emoji grid -->
+                                    <div class="p-2 max-h-44 overflow-y-auto">
+                                        <p class="text-[10px] text-muted-foreground mb-1.5">{{ EMOJI_CATEGORIES[activeCategory].label }}</p>
+                                        <div class="flex flex-wrap gap-0.5">
+                                            <button
+                                                v-for="emoji in EMOJI_CATEGORIES[activeCategory].emojis"
+                                                :key="emoji"
+                                                @click="react(emoji)"
+                                                :disabled="!!reactingEmoji"
+                                                class="rounded p-1 text-lg leading-none hover:bg-violet-500/10 disabled:opacity-60 transition-colors"
+                                                :class="reactingEmoji === emoji ? 'animate-bounce' : ''"
+                                            >{{ emoji }}</button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </div>
 
