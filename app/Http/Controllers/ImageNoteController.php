@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Image;
 use App\Models\ImageNote;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Session;
 
 class ImageNoteController extends Controller
 {
