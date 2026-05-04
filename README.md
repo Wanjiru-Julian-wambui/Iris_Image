@@ -1,0 +1,387 @@
+# 🔵 Iris — Your Images. Everywhere.
+
+![Iris Platform](https://iris-main-ocga6c.free.laravel.cloud/)
+
+> **A beautifully fast image hosting platform with CDN delivery, smart organisation, and privacy controls — built for developers and creators.**
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-iris--main--ocga6c.free.laravel.cloud-7B2FFF?style=for-the-badge&logo=laravel)](https://iris-main-ocga6c.free.laravel.cloud/)
+[![Laravel](https://img.shields.io/badge/Laravel-13.1-FF2D20?style=for-the-badge&logo=laravel)](https://laravel.com)
+[![Vue](https://img.shields.io/badge/Vue-3.x-42b883?style=for-the-badge&logo=vue.js)](https://vuejs.org)
+[![Inertia](https://img.shields.io/badge/Inertia.js-1.x-9553E9?style=for-the-badge)](https://inertiajs.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org)
+
+---
+
+## ✨ What is Iris?
+
+Iris is a **full-stack image hosting SaaS** built on Laravel 13 + Vue 3 + Inertia.js. It gives individuals and teams a private, fast, and beautiful place to upload, organise, share, and deliver images — with enterprise-grade features like expiring links, EXIF stripping, CDN delivery via Imgix/Cloudflare R2, watermarking, compression, and full webhook/API support.
+
+---
+
+## 🚀 Live Demo
+
+**[https://iris-main-ocga6c.free.laravel.cloud/](https://iris-main-ocga6c.free.laravel.cloud/)**
+
+| Credential | Value |
+|---|---|
+| Email | `test@example.com` |
+| Password | `password` |
+
+---
+
+## ⚡ Key Highlights
+
+| Metric | Value |
+|---|---|
+| **Avg CDN load time** | ~42ms |
+| **Compression savings** | Up to −68% file size |
+| **Edge nodes (via R2 + Imgix)** | 200+ |
+| **Max file size** | 100 MB |
+| **Max files per upload** | 20 |
+| **Storage plans** | 1 GB Free → 50 GB Pro → 200 GB Team |
+
+---
+
+## 🖼️ Platform Preview
+
+![Iris Platform — Your images. Everywhere.](/welcome.png)
+
+> **Left:** Hero copy with tagline, CTA buttons, and social proof badges (No credit card · Free 1 GB · Instant setup · Cancel anytime)
+>
+> **Right:** Live gallery UI showing the masonry image grid, real-time upload progress bar (74%), and three floating stat cards:
+> - 🟢 **AVG LOAD TIME — 42ms** (CDN-delivered images)
+> - 🟣 **COMPRESSION — −68%** (in-browser Canvas compression before upload)
+> - 🔵 **EDGE NODES — 200+** (Cloudflare R2 + Imgix global CDN)
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend
+| Layer | Technology |
+|---|---|
+| Framework | Laravel 13.1.1 |
+| PHP | 8.5.3 |
+| Database | SQLite (dev) / MySQL / PostgreSQL (prod) |
+| Queue | Laravel Queue (database driver) |
+| Storage | Local / AWS S3 / **Cloudflare R2** |
+| Image CDN | **Imgix** (200+ edge nodes) |
+| Image Processing | **Cloudinary** / GD (server-side) |
+| Auth | Laravel Fortify + 2FA (TOTP) |
+| API | Laravel Sanctum + custom API keys |
+
+### Frontend
+| Layer | Technology |
+|---|---|
+| Framework | Vue 3 + TypeScript |
+| Routing | Inertia.js |
+| Styling | Tailwind CSS + shadcn/ui |
+| Charts | Recharts |
+| Icons | Lucide Vue |
+| Compression | Canvas API (browser-side) |
+| EXIF | exifr (dynamic import) |
+
+---
+
+## 📦 Features
+
+### 🖼️ Core Image Management
+- **Upload** — drag & drop, clipboard paste (`Ctrl+V`), or click to browse
+- **In-browser compression** — Canvas API reduces file size up to 68% before upload
+- **EXIF stripping** — GPS, camera data removed server-side on upload
+- **Bulk select + ZIP download** — select multiple images, download as `.zip`
+- **Bulk delete** — delete multiple images in one action
+- **Drag-to-reorder** — custom sort order with `sort_order` column
+- **Trash + restore** — soft delete with 30-day bin before permanent removal
+- **Scheduled publishing** — set a future `publish_at` date
+- **Download counter** — tracks how many times each image has been downloaded
+- **Caption + alt text** — editable metadata on every image
+- **Image versioning** — re-upload replaces but keeps old version accessible
+
+### 🔗 Sharing
+- **Expiring links** — create links that auto-expire (1 hour → 30 days)
+- **Password-protected links** — bcrypt-hashed password on shared links
+- **View history** — IP (masked), browser, and timestamp logged per view
+- **Public embed codes** — `<img>`, BBCode, and Markdown snippets
+- **Public image URLs** — imgur-style direct links at `/i/{token}`
+- **Social media preview cards** — Open Graph + Twitter Card meta tags
+
+### 🏷️ Organisation
+- **Albums** — group images into named collections with cover image
+- **Password-protected albums** — lock albums behind a password
+- **Tags** — tag images, search and filter by tag
+- **Batch tag editor** — apply tags to multiple images at once
+- **Search** — full-text search across name, caption, alt text, and tags
+- **Image EXIF viewer** — display camera make/model, GPS, ISO, aperture inline
+
+### 📊 Analytics & Dashboard
+- **Upload history chart** — bar chart of uploads per day (last 30 days)
+- **Storage trend** — line chart of cumulative storage growth
+- **Link views chart** — line chart of shared link views per day
+- **Stats cards** — total images, total links, downloads, storage used
+
+### 👤 Profiles
+- **Public profile page** — `/@username` with avatar, bio, and public gallery
+- **Avatar upload** — stored on configured disk (local/R2/S3)
+- **Username** — unique, URL-safe handle
+
+### 🔔 Notifications
+- **Weekly link view digest** — email summary every Monday
+- **Storage quota warnings** — email at 70% and 90% usage
+- **Custom email templates** — admin-editable invite and digest emails
+
+### 🔗 Webhooks & Integrations
+- **Webhooks** — fire on `image.uploaded`, `image.deleted`, `link.viewed`
+- **HMAC-SHA256 signatures** — secure payload verification
+- **Zapier integration** — REST hook triggers for any Zap workflow
+- **Slack notifications** — post upload events to a Slack channel
+- **Discord bot** — `/iris upload` command returns direct image URL
+- **CSV export** — export all image metadata as a spreadsheet
+
+### 🔐 Security & Access
+- **Two-factor authentication** — TOTP via Google Authenticator / Authy
+- **API key management** — scoped keys with abilities and expiry dates
+- **IP allowlist** — restrict access to specific IPs or CIDR ranges
+- **SAML SSO** — enterprise login via Okta, Azure AD, Google Workspace
+- **LDAP / Active Directory** — authenticate against company directory
+- **Custom roles & permissions** — full RBAC beyond admin/user
+- **Invitation-only registration** — admin sends invite tokens
+
+### 🎨 Advanced Image Tools
+- **Watermark on download** — embed text at any position and opacity
+- **Image format converter** — JPG → PNG → WEBP → GIF (GD-based)
+- **Face / region blurring** — pixelate selected areas with GD
+- **Side-by-side comparison** — drag divider to compare two images
+- **Image annotations** — draw arrows, boxes, and text overlays on canvas
+- **Bulk image editor** — adjust brightness, contrast, saturation (Canvas API)
+- **Broken link checker** — find and purge expired shared links
+
+### 🌐 Developer Tools
+- **REST API** — authenticated via Bearer token or API key
+- **CLI tool** — `iris upload ./photo.jpg` returns direct URL
+- **SFTP / FTP upload** — connect any FTP client to upload
+- **WordPress plugin** — sync media library with Iris
+- **Browser extension** — right-click any image → upload to Iris
+
+### ♿ Accessibility & Compliance
+- **Alt text completeness score** — dashboard showing % of images with alt text
+- **Auto-caption suggestions** — AI-generated alt text on upload
+- **Sign language video overlay** — attach video description to public images
+- **NFT metadata export** — OpenSea-compatible JSON at `/nft/{token}/metadata.json`
+- **Blockchain proof of upload** — SHA-256 timestamp hash
+
+### 🏢 Reseller / White-label
+- **Multi-tenant reseller mode** — custom domain, logo, and brand colours per tenant
+- **Custom CSS variables** — `--iris-primary` and `--iris-accent` per tenant
+- **Tenant-scoped data** — reseller users only see their own tenant's data
+
+---
+
+## 🗂️ Project Structure
+
+```
+iris/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/        # ImageController, AlbumController, etc.
+│   │   ├── Middleware/         # CheckStorageLimit, AdminMiddleware, CheckIpAllowlist
+│   │   ├── Requests/           # ImageUploadRequest, SharedLinkRequest
+│   │   └── Resources/          # ImageResource, SharedLinkResource, UserResource
+│   ├── Models/                 # Image, Album, Tag, SharedLink, Webhook, ApiKey...
+│   ├── Services/               # ImageService, ZipService, WatermarkService,
+│   │                           # ImgixService, CloudinaryService, WebhookService...
+│   └── Mail/                   # InvitationMail, StorageWarningMail, DigestMail
+├── config/
+│   ├── iris.php                # All Iris-specific config (plans, drivers, Imgix, Cloudinary)
+│   └── filesystems.php         # Local, S3, and R2 disk configs
+├── database/
+│   ├── migrations/             # 15+ migrations
+│   └── seeders/                # PlanSeeder, DatabaseSeeder
+├── resources/js/
+│   ├── composables/            # useUpload, useCompression, useExif, useSharedLink
+│   ├── components/
+│   │   ├── Upload/             # DropZone, UploadProgress, FilePreview, CompressionOptions
+│   │   ├── Gallery/            # ImageCard, ImageGrid, ImageLightbox
+│   │   ├── Shared/             # ExpiringLinkModal, ShareButton
+│   │   ├── Plans/              # PlanCard, PlanBadge
+│   │   └── Admin/              # StatsCard, UserTable
+│   ├── pages/
+│   │   ├── images/             # Index, Create, Show, Trash
+│   │   ├── shared-links/       # Index, Create
+│   │   ├── albums/             # Index, Show, Create
+│   │   ├── settings/           # Webhooks, ApiKeys, Profile
+│   │   └── admin/              # Index, Users/Index, Users/Show
+│   └── stores/                 # useImageStore, useAuthStore
+└── routes/
+    ├── web.php                 # All app routes
+    └── admin.php               # Admin-only routes
+```
+
+---
+
+## 🚀 Installation
+
+### Requirements
+- PHP 8.2+
+- Composer
+- Node.js 18+
+- SQLite / MySQL / PostgreSQL
+- ZipArchive PHP extension (for bulk download)
+- GD PHP extension (for watermarking and format conversion)
+
+### Quick Start
+
+```bash
+# Clone
+git clone https://github.com/yourname/iris.git
+cd iris
+
+# Install PHP dependencies
+composer install
+
+# Install JS dependencies
+npm install
+
+# Environment setup
+cp .env.example .env
+php artisan key:generate
+
+# Database
+php artisan migrate --seed
+
+# Storage link
+php artisan storage:link
+
+# Build assets
+npm run build
+
+# Serve
+php artisan serve
+```
+
+### Default credentials (after seeding)
+```
+Email:    test@example.com
+Password: password
+```
+
+---
+
+## ⚙️ Configuration
+
+### Storage drivers (`.env`)
+```env
+# Local (default for development)
+IRIS_STORAGE_DISK=public
+
+# Cloudflare R2 (recommended for production)
+IRIS_STORAGE_DISK=r2
+R2_ACCESS_KEY_ID=your_key
+R2_SECRET_ACCESS_KEY=your_secret
+R2_BUCKET=iris-images
+R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_PUBLIC_URL=https://pub-<hash>.r2.dev
+
+# AWS S3
+IRIS_STORAGE_DISK=s3
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=iris-images
+```
+
+### CDN / Image processing
+```env
+# Imgix (serves images from R2 with transforms)
+IMGIX_ENABLED=true
+IMGIX_DOMAIN=your-source.imgix.net
+IMGIX_SIGN_URLS=false
+
+# Cloudinary (upload-time processing)
+CLOUDINARY_ENABLED=false
+CLOUDINARY_CLOUD_NAME=your_cloud
+CLOUDINARY_API_KEY=your_key
+CLOUDINARY_API_SECRET=your_secret
+```
+
+### Recommended production setup
+```env
+IRIS_STORAGE_DISK=r2      # Store on R2
+IMGIX_ENABLED=true         # Serve via Imgix CDN
+CLOUDINARY_ENABLED=false   # Imgix handles transforms
+```
+
+---
+
+## 📡 API
+
+Iris has a REST API authenticated via API key.
+
+```bash
+# Set your API key
+export IRIS_KEY="iris_xxxxxxxxxxxxxxxxxxxx"
+
+# List images
+curl https://iris-main-ocga6c.free.laravel.cloud/api/images \
+  -H "Authorization: Bearer $IRIS_KEY"
+
+# Upload an image
+curl -X POST https://iris-main-ocga6c.free.laravel.cloud/api/images \
+  -H "Authorization: Bearer $IRIS_KEY" \
+  -F "image=@photo.jpg"
+
+# Create a shared link
+curl -X POST https://iris-main-ocga6c.free.laravel.cloud/api/shared-links \
+  -H "Authorization: Bearer $IRIS_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"image_id": 1, "expires_in": 24}'
+```
+
+---
+
+## 🔗 Plans
+
+| | Free | Pro | Team |
+|---|---|---|---|
+| Storage | 1 GB | 50 GB | 200 GB |
+| Price | $0/mo | $9/mo | $29/mo |
+| Expiring links | ✗ | ✓ | ✓ |
+| Password-protected links | ✗ | ✓ | ✓ |
+| View history | ✗ | ✓ | ✓ |
+| Team folders | ✗ | ✗ | ✓ |
+| Admin dashboard | ✗ | ✗ | ✓ |
+| Priority support | ✗ | ✗ | ✓ |
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, please open an issue first.
+
+```bash
+# Development
+npm run dev
+php artisan serve
+
+# Tests
+php artisan test
+
+# Code style
+./vendor/bin/pint
+```
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+Built with ❤️ using **Laravel** + **Vue 3** + **Inertia.js**
+
+**[🌐 Live Demo](https://iris-main-ocga6c.free.laravel.cloud/)** · **[📖 Docs](https://iris-main-ocga6c.free.laravel.cloud/docs)** · **[🐛 Issues](https://github.com/yourname/iris/issues)**
+
+</div>
