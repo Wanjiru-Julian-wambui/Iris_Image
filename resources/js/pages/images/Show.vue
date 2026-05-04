@@ -254,11 +254,14 @@ const hasAnyReaction = computed(() =>
 );
 
 // ── React functions ──────────────────────────────────────────────────────────
+// FIXED: Use the correct authenticated route with image ID
 
 function reactEmoji(emoji: string) {
     if (submitting.value) return;
     submitting.value = true;
     showPicker.value = false;
+    
+    // CORRECT: Use /images/{id}/reactions (authenticated route)
     router.post(`/images/${props.image.id}/reactions`, {
         type: 'emoji', emoji,
     }, {
@@ -271,6 +274,8 @@ function reactMedia(type: 'gif' | 'sticker', media_url: string, media_label: str
     if (submitting.value) return;
     submitting.value = true;
     showPicker.value = false;
+    
+    // CORRECT: Use /images/{id}/reactions (authenticated route)
     router.post(`/images/${props.image.id}/reactions`, {
         type, media_url, media_label, media_source,
     }, {

@@ -32,6 +32,10 @@ Route::post('/share/{token}', [SharedLinkController::class, 'verify'])->name('sh
 
 Route::get('/i/{token}', [PublicImageController::class, 'show'])->name('public.image');
 
+// Public reactions — guests can react to images via short URL
+Route::post('/i/{image:public_token}/react', [ImageReactionController::class, 'store'])
+    ->name('public.image.react');
+
 // Public polls
 Route::get('/poll/{token}',       [ImagePollController::class, 'show'])->name('polls.show');
 Route::post('/poll/{token}/vote', [ImagePollController::class, 'vote'])->name('polls.vote');
@@ -42,7 +46,7 @@ Route::get('/@{username}', [PublicProfileController::class, 'show'])->name('prof
 // ── Emoji & Reactions (Public — guests can react) ─────────────────────────
 Route::get('/emojis', [EmojiController::class, 'index']);
 
-// Reaction routes MUST be before /images/{image} wildcard in auth group
+// Authenticated reaction route (for dashboard/show page)
 Route::post('/images/{image}/reactions', [ImageReactionController::class, 'store'])
     ->name('images.reactions.store');
 Route::get('/reactions/giphy', [ImageReactionController::class, 'searchGiphy'])
@@ -151,11 +155,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Public albums
         Route::get('/a/{token}',         [PublicAlbumController::class, 'show'])->name('albums.public.show');
         Route::post('/a/{token}/verify', [PublicAlbumController::class, 'verify'])->name('albums.public.verify');
-
-        // NOTE: /i/{token} is intentionally NOT duplicated here.
-        // The public route above handles it for all users (auth or not).
-        // Duplicating it here caused a named route conflict that broke
-        // image URL resolution in polls.
 
     }); // end plan.selected
 
