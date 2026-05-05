@@ -15,12 +15,6 @@ use Inertia\Response;
 
 class ImagePollController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware(['auth', 'admin'])->only(['index', 'create', 'store', 'destroy']);
-        // show and vote are fully public — no middleware
-    }
-
     public function index(Request $request): Response
     {
         $polls = $request->user()
@@ -51,12 +45,8 @@ class ImagePollController extends Controller
         $data = $request->validate([
             'type'         => ['required', 'in:ab,multi'],
             'question'     => ['required', 'string', 'max:200'],
-
-            // A/B specific
             'image_a_id'   => ['required_if:type,ab', 'nullable', 'integer', 'exists:images,id'],
             'image_b_id'   => ['required_if:type,ab', 'nullable', 'integer', 'exists:images,id', 'different:image_a_id'],
-
-            // Multi specific
             'image_ids'    => ['required_if:type,multi', 'nullable', 'array', 'min:2'],
             'image_ids.*'  => ['integer', 'exists:images,id'],
             'max_choices'  => ['nullable', 'integer', 'min:1'],
