@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { BarChart3, Plus, Trash2, Link2 } from 'lucide-vue-next';
+import { BarChart3, Check, Plus, Share2, Trash2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const confirmDelete = ref<App.ImagePoll | null>(null);
-const deleting = ref(false);
+const deleting      = ref(false);
+const copiedId      = ref<number | null>(null);
 
 function deletePoll() {
     if (!confirmDelete.value) return;
@@ -37,11 +38,20 @@ function deletePoll() {
     });
 }
 
-function copyUrl(url: string) {
-    navigator.clipboard.writeText(url);
+function sharePoll(poll: App.ImagePoll) {
+    if (navigator.share) {
+        navigator.share({
+            title: poll.question,
+            text: 'Vote on this poll!',
+            url: poll.public_url,
+        }).catch(() => {});
+    } else {
+        navigator.clipboard.writeText(poll.public_url);
+        copiedId.value = poll.id;
+        setTimeout(() => { copiedId.value = null; }, 2000);
+    }
 }
 
-// For multi polls, get the top N images by vote count
 function topImages(poll: App.ImagePoll, n = 4) {
     if (!poll.images) return [];
     const items: any[] = poll.results?.items ?? [];
@@ -55,13 +65,11 @@ function topImages(poll: App.ImagePoll, n = 4) {
 }
 
 function multiPercent(poll: App.ImagePoll, imageId: number) {
-    const item = (poll.results?.items ?? []).find((r: any) => r.image_id === imageId);
-    return item?.percent ?? 0;
+    return (poll.results?.items ?? []).find((r: any) => r.image_id === imageId)?.percent ?? 0;
 }
 
 function multiCount(poll: App.ImagePoll, imageId: number) {
-    const item = (poll.results?.items ?? []).find((r: any) => r.image_id === imageId);
-    return item?.count ?? 0;
+    return (poll.results?.items ?? []).find((r: any) => r.image_id === imageId)?.count ?? 0;
 }
 </script>
 
@@ -73,7 +81,9 @@ function multiCount(poll: App.ImagePoll, imageId: number) {
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">Polls</h1>
-                    <p class="text-sm text-muted-foreground mt-1">{{ polls.meta.total }} poll{{ polls.meta.total !== 1 ? 's' : '' }}</p>
+                    <p class="text-sm text-muted-foreground mt-1">
+                        {{ polls.meta.total }} poll{{ polls.meta.total !== 1 ? 's' : '' }}
+                    </p>
                 </div>
                 <Link href="/polls/create">
                     <Button class="gap-2 bg-gradient-to-r from-violet-500 to-cyan-400 text-white hover:opacity-90">
@@ -105,15 +115,31 @@ function multiCount(poll: App.ImagePoll, imageId: number) {
 
                         <!-- Title row -->
                         <div class="flex items-start justify-between gap-2">
-                            <div class="space-y-1">
-                                <h3 class="text-sm font-semibold leading-tight">{{ poll.question }}</h3>
-                                <Badge variant="secondary" class="text-[10px] capitalize">{{ poll.type === 'ab' ? 'A/B' : 'Multi' }}</Badge>
+                            <div class="space-y-1 min-w-0">
+                                <h3 class="text-sm font-semibold leading-tight truncate">{{ poll.question }}</h3>
+                                <Badge variant="secondary" class="text-[10px] capitalize">
+                                    {{ poll.type === 'ab' ? 'A/B' : 'Multi' }}
+                                </Badge>
                             </div>
                             <div class="flex items-center gap-1 shrink-0">
-                                <button @click="copyUrl(poll.public_url)" class="text-muted-foreground hover:text-violet-400 transition-colors p-1">
-                                    <Link2 class="h-3.5 w-3.5" />
+                                <!-- Share button -->
+                                <button
+                                    @click="sharePoll(poll)"
+                                    class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                                    :class="copiedId === poll.id
+                                        ? 'bg-emerald-500/10 text-emerald-400'
+                                        : 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20'"
+                                >
+                                    <Check v-if="copiedId === poll.id" class="h-3.5 w-3.5" />
+                                    <Share2 v-else class="h-3.5 w-3.5" />
+                                    {{ copiedId === poll.id ? 'Copied!' : 'Share' }}
                                 </button>
-                                <button @click="confirmDelete = poll" class="text-muted-foreground hover:text-rose-400 transition-colors p-1">
+                                <!-- Delete button -->
+                                <button
+                                    @click="confirmDelete = poll"
+                                    class="rounded-md p-1.5 text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                    title="Delete poll"
+                                >
                                     <Trash2 class="h-3.5 w-3.5" />
                                 </button>
                             </div>
@@ -161,7 +187,6 @@ function multiCount(poll: App.ImagePoll, imageId: number) {
 
                         <!-- ── Multi preview ── -->
                         <template v-else>
-                            <!-- Show up to 4 images in a 2x2 grid -->
                             <div class="grid grid-cols-4 gap-1.5">
                                 <div
                                     v-for="img in topImages(poll, 4)"
@@ -173,7 +198,6 @@ function multiCount(poll: App.ImagePoll, imageId: number) {
                                         {{ multiPercent(poll, img.id) }}%
                                     </div>
                                 </div>
-                                <!-- Overflow indicator -->
                                 <div
                                     v-if="(poll.images?.length ?? 0) > 4"
                                     class="relative rounded-md overflow-hidden aspect-square bg-muted flex items-center justify-center"
@@ -189,8 +213,8 @@ function multiCount(poll: App.ImagePoll, imageId: number) {
                             </div>
                         </template>
 
-                        <!-- Footer row (shared) -->
-                        <div class="flex items-center justify-between pt-1">
+                        <!-- Footer row -->
+                        <div class="flex items-center justify-between pt-1 border-t border-border">
                             <span class="text-xs text-muted-foreground">{{ poll.created_at }}</span>
                             <Link :href="poll.public_url" target="_blank">
                                 <Button variant="outline" size="sm" class="h-7 text-xs gap-1">

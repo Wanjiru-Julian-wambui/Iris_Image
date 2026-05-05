@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { Check, ArrowLeft } from 'lucide-vue-next';
+import { ArrowLeft, Check, Share2 } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,9 +13,27 @@ const voting       = ref(false);
 const votedChoice  = ref<string | null>(props.poll.user_vote ?? null);
 const votedChoices = ref<number[]>(props.poll.user_votes ?? []);
 const hasVoted     = ref(props.poll.has_voted ?? false);
+const copied       = ref(false);
 
 const isAb    = computed(() => props.poll.type === 'ab');
 const isMulti = computed(() => props.poll.type === 'multi');
+
+// ── Share ─────────────────────────────────────────────────────────────────────
+
+function sharePoll() {
+    const url = window.location.href;
+    if (navigator.share) {
+        navigator.share({
+            title: props.poll.question,
+            text: 'Vote on this poll!',
+            url,
+        }).catch(() => {});
+    } else {
+        navigator.clipboard.writeText(url);
+        copied.value = true;
+        setTimeout(() => { copied.value = false; }, 2000);
+    }
+}
 
 // ── A/B ──────────────────────────────────────────────────────────────────────
 
@@ -94,9 +112,23 @@ const sortedByVotes = computed(() => {
                     </div>
                     <span class="font-bold tracking-tight">Iris Poll</span>
                 </div>
-                <a href="/login">
-                    <Button variant="outline" size="sm">Sign in</Button>
-                </a>
+                <div class="flex items-center gap-2">
+                    <!-- Share button -->
+                    <button
+                        @click="sharePoll"
+                        class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                        :class="copied
+                            ? 'bg-emerald-500/10 text-emerald-400'
+                            : 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20'"
+                    >
+                        <Check v-if="copied" class="h-3.5 w-3.5" />
+                        <Share2 v-else class="h-3.5 w-3.5" />
+                        {{ copied ? 'Copied!' : 'Share' }}
+                    </button>
+                    <a href="/login">
+                        <Button variant="outline" size="sm">Sign in</Button>
+                    </a>
+                </div>
             </div>
         </header>
 
