@@ -94,14 +94,14 @@ const sortedByVotes = computed(() => {
                     </div>
                     <span class="font-bold tracking-tight">Iris Poll</span>
                 </div>
-                <Link href="/login">
+                <a href="/login">
                     <Button variant="outline" size="sm">Sign in</Button>
-                </Link>
+                </a>
             </div>
         </header>
 
         <div class="max-w-3xl mx-auto px-4 py-8">
-            <button @click="$router.back()" class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+            <button @click="history.back()" class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
                 <ArrowLeft class="h-4 w-4" />
                 Back
             </button>
@@ -139,7 +139,7 @@ const sortedByVotes = computed(() => {
                             <span class="text-sm font-medium">Vote for {{ side.toUpperCase() }}</span>
                         </div>
                         <div v-if="voting" class="absolute inset-0 bg-background/60 flex items-center justify-center">
-                            <span class="h-8 w-8 animate-spin rounded-full border-3 border-violet-500 border-t-transparent" />
+                            <span class="h-8 w-8 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
                         </div>
                     </button>
                 </div>

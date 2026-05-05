@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import {
+    BarChart3,
     CreditCard,
+    FolderOpen,
     Image as ImageIcon,
+    Images,
     Key,
     KeyRound,
     LayoutGrid,
     Link as LinkIcon,
     Mail,
     Shield,
-    Images,
-    FolderOpen,
     Tags,
-    BarChart3
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -33,26 +33,26 @@ import {
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
-const page    = usePage();
-const user    = computed(() => (page.props.auth as any)?.user ?? null);
-const isAdmin = computed(() => user.value?.is_admin === true);
+const page     = usePage();
+const user     = computed(() => (page.props.auth as any)?.user ?? null);
+const isAdmin  = computed(() => user.value?.is_admin === true);
 const userPlan = computed(() => user.value?.plan ?? null);
 
 const mainNavItems: NavItem[] = [
-    { title: 'Dashboard',       href: dashboard(),                    icon: LayoutGrid  },
-    { title: 'Images',          href: '/images',                      icon: Images      },
-    { title: 'Gallery',         href: '/gallery',                     icon: ImageIcon   },
-    { title: 'Albums',          href: '/albums',                      icon: FolderOpen  },
-    { title: 'Shared Links',    href: '/shared-links',                icon: LinkIcon    },
-    { title: 'API Keys',        href: '/settings/api-keys',           icon: Key         },
-    { title: 'API Credentials', href: '/settings/api-credentials',    icon: KeyRound    },
-    { title: 'Tags',            href: '/tags',                        icon: Tags        },
+    { title: 'Dashboard',       href: dashboard(),                 icon: LayoutGrid },
+    { title: 'Images',          href: '/images',                   icon: Images     },
+    { title: 'Gallery',         href: '/gallery',                  icon: ImageIcon  },
+    { title: 'Albums',          href: '/albums',                   icon: FolderOpen },
+    { title: 'Shared Links',    href: '/shared-links',             icon: LinkIcon   },
+    { title: 'Tags',            href: '/tags',                     icon: Tags       },
+    { title: 'Polls',           href: '/polls',                    icon: BarChart3  },
+    { title: 'API Keys',        href: '/settings/api-keys',        icon: Key        },
+    { title: 'API Credentials', href: '/settings/api-credentials', icon: KeyRound   },
 ];
 
 const adminNavItems: NavItem[] = [
-    { title: 'Polls',       href: '/polls',       icon: BarChart3 },
-    { title: 'Admin',       href: '/admin',       icon: Shield    },
-    { title: 'Invitations', href: '/invitations', icon: Mail      },
+    { title: 'Admin',       href: '/admin',       icon: Shield },
+    { title: 'Invitations', href: '/invitations', icon: Mail   },
 ];
 </script>
 

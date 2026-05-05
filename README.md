@@ -311,7 +311,169 @@ php artisan test
 ```
 
 ---
+# Security & API
 
+Complete implementation across six features. All files follow the existing Iris conventions (Inertia/Vue 3, Laravel 11, shadcn-vue, Tailwind, Sanctum).
+
+---
+
+## Feature 1 — Two-Factor Authentication (2FA)
+Uses the existing `Laravel\Fortify` TOTP pipeline already wired in `SecurityController.php` and `Security.vue`. No new backend files required — Fortify handles QR generation, confirmation, recovery codes, and the login challenge step.
+
+**Key files (already in codebase):**
+- `app/Http/Controllers/Settings/SecurityController.php`
+- `resources/js/pages/settings/Security.vue`
+- `resources/js/components/TwoFactorSetupModal.vue`
+- `resources/js/components/TwoFactorRecoveryCodes.vue`
+
+---
+
+## Feature 2 — API Key Management (Sanctum Bearer tokens)
+Already fully implemented. New files are not needed.
+
+**Key files (already in codebase):**
+- `app/Http/Controllers/ApiKeyController.php`
+- `resources/js/pages/settings/ApiKeys.vue`
+- Routes in `routes/web.php` under `/settings/api-keys`
+
+---
+
+## Feature 3 — SAML SSO (Enterprise)
+
+**New files:**
+| File | Purpose |
+|------|---------|
+| `app/Http/Controllers/SamlController.php` | Handles `Saml2LoginEvent`, syncs/creates local User, logs in via `Auth::login()`. Also serves the SSO landing page. |
+| `resources/js/pages/auth/SsoLogin.vue` | Enterprise SSO entry page with IdP redirect button. |
+| `routes/group-h.php` | Registers `/sso/login` route. |
+
+**Package:** `composer require aacotroneo/laravel-saml2`
+
+**Config steps:**
+1. Publish config: `php artisan vendor:publish --tag=saml2_config`
+2. Set `SAML2_*` env vars (entity ID, ACS URL, IdP metadata URL)
+3. Register `SamlController@handleLogin` as a listener for `Saml2LoginEvent` in `EventServiceProvider`
+
+---
+
+## Feature 4 — LDAP / Active Directory
+
+**New files:**
+| File | Purpose |
+|------|---------|
+| `app/Http/Controllers/Auth/LdapLoginController.php` | Attempts LDAP bind; on success syncs/creates local User; falls back to Eloquent auth if LDAP is unreachable. |
+| `routes/group-h.php` | Registers `POST /ldap/login` route. |
+
+**Package:** `composer require directorytree/ldaprecord-laravel`
+
+**Config steps:**
+1. Publish config: `php artisan vendor:publish --provider="LdapRecord\Laravel\LdapAuthServiceProvider"`
+2. Set `LDAP_HOST`, `LDAP_BASE_DN`, `LDAP_USERNAME`, `LDAP_PASSWORD` in `.env`
+3. Optionally wire Fortify to use `LdapLoginController@login` as the `authenticateUsing` callback
+
+---
+
+## Feature 5 — IP-Based Access Control
+
+**New files:**
+| File | Purpose |
+|------|---------|
+| `app/Http/Middleware/CheckIpAllowlist.php` | Reads `user->ip_allowlist` (JSON array), checks `request()->ip()` against entries. Supports IPv4, IPv6, and CIDR ranges. |
+| `app/Http/Controllers/Settings/IpAllowlistController.php` | CRUD for the per-user allowlist. |
+| `resources/js/pages/settings/IpAllowlist.vue` | Settings page with add/remove UI, CIDR badge, format guide. |
+| `database/migrations/…add_ip_allowlist_to_users_table.php` | Adds `ip_allowlist JSON NULL` column. |
+| `routes/group-h.php` | Registers `GET/PUT /settings/ip-allowlist`. |
+
+**Registration:** Add `CheckIpAllowlist` to the `auth` middleware group in `bootstrap/app.php`:
+```php
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->appendToGroup('auth', \App\Http\Middleware\CheckIpAllowlist::class);
+})
+```
+
+Also add `ip_allowlist` to the User model's `$casts`:
+```php
+protected $casts = [
+    'ip_allowlist' => 'array',
+    // …
+];
+```
+
+---
+
+## Feature 6 — Custom Roles & Permissions (RBAC)
+
+**New files:**
+| File | Purpose |
+|------|---------|
+| `app/Models/Role.php` | Eloquent model with `permissions()` and `users()` many-to-many relations. |
+| `app/Models/Permission.php` | Eloquent model. |
+| `app/Concerns/HasRoles.php` | Trait for User model — `can()`, `canAll()`, `canAny()`, `hasRole()`, `assignRole()`, `removeRole()`. Admins bypass all checks. |
+| `app/Http/Controllers/Admin/RoleController.php` | Admin CRUD for roles + permission sync + assign/revoke on users. |
+| `resources/js/pages/admin/Roles/Index.vue` | Full role manager with create/edit/delete dialogs and permission matrix grouped by category. |
+| `resources/js/pages/admin/Users/Show.vue` | Extended with role assignment panel (assign/revoke per-role). |
+| `database/migrations/…create_roles_and_permissions_tables.php` | Creates `roles`, `permissions`, `role_permission`, `role_user` tables. |
+| `database/seeders/RolesAndPermissionsSeeder.php` | Seeds four built-in roles (admin, moderator, uploader, viewer) with correct permission sets. |
+| `routes/group-h.php` | Registers `/admin/roles` CRUD + `/admin/users/{user}/roles` assign/revoke. |
+
+**Integration steps:**
+
+1. Add `HasRoles` trait to `User` model:
+```php
+use App\Concerns\HasRoles;
+
+class User extends Authenticatable
+{
+    use HasRoles, HasApiTokens, /* … */;
+}
+```
+
+2. Run migrations & seeder:
+```bash
+php artisan migrate
+php artisan db:seed --class=RolesAndPermissionsSeeder
+```
+
+3. Add Roles link to admin sidebar in `AppSidebar.vue`:
+```vue
+{ title: 'Roles', href: '/admin/roles', icon: ShieldCheck },
+```
+
+4. Pass `roles` and `userRoles` from `UserController@show`:
+```php
+public function show(User $user): Response
+{
+    $user->load('plan', 'roles')->loadCount('images');
+    return Inertia::render('admin/Users/Show', [
+        'user'      => new UserResource($user),
+        'images'    => $user->images()->latest()->paginate(12),
+        'roles'     => Role::select('id', 'name', 'label')->get(),
+        'userRoles' => $user->roles->map->only('id','name','label'),
+    ]);
+}
+```
+
+5. Use `@can` in Blade or `user.can('permission.name')` via shared Inertia props for frontend gates.
+
+---
+
+## Routes summary (routes/group-h.php)
+
+```
+GET  /sso/login                              → SamlController@loginPage
+POST /ldap/login                             → LdapLoginController@login
+
+GET  /settings/ip-allowlist                  → IpAllowlistController@edit
+PUT  /settings/ip-allowlist                  → IpAllowlistController@update
+
+GET    /admin/roles                          → RoleController@index
+POST   /admin/roles                          → RoleController@store
+PUT    /admin/roles/{role}                   → RoleController@update
+DELETE /admin/roles/{role}                   → RoleController@destroy
+POST   /admin/users/{user}/roles             → RoleController@assignToUser
+DELETE /admin/users/{user}/roles             → RoleController@revokeFromUser
+```
+---
 ## 📄 License
 
 MIT — see [LICENSE](LICENSE) for details.

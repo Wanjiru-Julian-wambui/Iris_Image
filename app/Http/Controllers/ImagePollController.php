@@ -17,9 +17,8 @@ class ImagePollController extends Controller
 {
     public function __construct()
     {
-        // All poll management routes require an authenticated admin.
-        // The public vote/show route is handled separately (no middleware).
-        $this->middleware(['auth', 'admin'])->except(['show', 'vote']);
+        $this->middleware(['auth', 'admin'])->only(['index', 'create', 'store', 'destroy']);
+        // show and vote are fully public — no middleware
     }
 
     public function index(Request $request): Response

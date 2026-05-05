@@ -41,19 +41,16 @@ class ImagePoll extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** Classic A/B image A */
     public function imageA(): BelongsTo
     {
         return $this->belongsTo(Image::class, 'image_a_id');
     }
 
-    /** Classic A/B image B */
     public function imageB(): BelongsTo
     {
         return $this->belongsTo(Image::class, 'image_b_id');
     }
 
-    /** Multi-poll images (ordered) */
     public function images(): BelongsToMany
     {
         return $this->belongsToMany(Image::class, 'image_poll_items')
@@ -61,13 +58,11 @@ class ImagePoll extends Model
             ->orderByPivot('sort_order');
     }
 
-    /** Classic A/B votes */
     public function votes(): HasMany
     {
         return $this->hasMany(ImagePollVote::class, 'poll_id');
     }
 
-    /** Multi-poll votes */
     public function multiVotes(): HasMany
     {
         return $this->hasMany(ImagePollMultiVote::class);
@@ -85,9 +80,6 @@ class ImagePoll extends Model
         return $this->type === 'multi';
     }
 
-    /**
-     * Check whether a given visitor has already voted.
-     */
     public function hasVoted(string $ip, string $fingerprint, ?int $userId): bool
     {
         if ($this->isAb()) {
@@ -97,7 +89,6 @@ class ImagePoll extends Model
                 ->exists();
         }
 
-        // Multi: voted = at least one multi-vote row exists for this visitor
         return $this->multiVotes()
             ->when($userId, fn($q) => $q->where('user_id', $userId))
             ->when(!$userId, fn($q) => $q->where('ip_address', $ip)->where('session_fingerprint', $fingerprint))
@@ -106,12 +97,6 @@ class ImagePoll extends Model
 
     // ─── Results ─────────────────────────────────────────────────────────────
 
-    /**
-     * Returns results appropriate to the poll type.
-     *
-     * AB:    { a_count, b_count, a_percent, b_percent, total }
-     * Multi: [ { image_id, count, percent }, ... ]
-     */
     public function getResultsAttribute(): array
     {
         if ($this->isAb()) {
@@ -129,15 +114,15 @@ class ImagePoll extends Model
         }
 
         // Multi poll results
-        $total   = $this->multiVotes()->count(); // total individual votes cast
-        $counts  = $this->multiVotes()
+        $total  = $this->multiVotes()->count();
+        $counts = $this->multiVotes()
             ->selectRaw('image_id, COUNT(*) as vote_count')
             ->groupBy('image_id')
             ->pluck('vote_count', 'image_id');
 
-        // Unique voters (for "X people voted")
+        // Unique voters — using COALESCE with CAST for MySQL/Postgres compatibility
         $voters = $this->multiVotes()
-            ->selectRaw('COALESCE(user_id::text, ip_address) as voter')
+            ->selectRaw('COALESCE(CAST(user_id AS CHAR), ip_address) as voter')
             ->distinct()
             ->count();
 
@@ -153,9 +138,9 @@ class ImagePoll extends Model
         })->values()->all();
 
         return [
-            'items'       => $results,
-            'total_votes' => $total,
-            'total_voters'=> $voters,
+            'items'        => $results,
+            'total_votes'  => $total,
+            'total_voters' => $voters,
         ];
     }
 

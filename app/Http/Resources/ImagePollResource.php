@@ -30,9 +30,9 @@ class ImagePollResource extends JsonResource
             'images'       => $images ? ImageResource::collection($images) : null,
 
             'results'      => $this->results,
-            'has_voted'    => $this->has_voted,
-            'user_vote'    => $this->user_vote,   // ab: 'a'|'b'|null
-            'user_votes'   => $this->user_votes,  // multi: [image_id, ...] | null
+            'has_voted'    => $this->has_voted ?? false,
+            'user_vote'    => $this->user_vote ?? null,
+            'user_votes'   => $this->user_votes ?? null,
 
             'created_at'   => $this->created_at->diffForHumans(),
         ];
