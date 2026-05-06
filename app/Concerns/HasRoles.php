@@ -6,7 +6,15 @@ use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-
+/**
+ * Add this trait to the User model alongside the existing `HasApiTokens`.
+ *
+ * Usage in User.php:
+ *   use HasRoles;
+ *
+ * To wire into Laravel's Gate/can() system, add this to AuthServiceProvider::boot():
+ *   Gate::before(fn ($user, $ability) => $user->hasPermission($ability) ?: null);
+ */
 trait HasRoles
 {
     // ── Relationships ─────────────────────────────────────────────────────────
@@ -21,8 +29,12 @@ trait HasRoles
     /**
      * Check whether the user has a given permission via any of their roles.
      * Admins (is_admin === true) bypass all permission checks.
+     *
+     * Named hasPermission() to avoid conflicting with Authenticatable::can().
+     * Hook into Gate via Gate::before() in AuthServiceProvider if you want
+     * $user->can('images.upload') to work automatically.
      */
-    public function can(string $ability, mixed $arguments = []): bool
+    public function hasPermission(string $ability): bool
     {
         if ($this->is_admin) {
             return true;
@@ -38,12 +50,12 @@ trait HasRoles
     }
 
     /**
-     * Convenience: check that the user has ALL of the given permissions.
+     * Check that the user has ALL of the given permissions.
      */
-    public function canAll(string ...$abilities): bool
+    public function hasAllPermissions(string ...$abilities): bool
     {
         foreach ($abilities as $ability) {
-            if (! $this->can($ability)) {
+            if (! $this->hasPermission($ability)) {
                 return false;
             }
         }
@@ -52,12 +64,12 @@ trait HasRoles
     }
 
     /**
-     * Convenience: check that the user has at least one of the given permissions.
+     * Check that the user has at least one of the given permissions.
      */
-    public function canAny(string ...$abilities): bool
+    public function hasAnyPermission(string ...$abilities): bool
     {
         foreach ($abilities as $ability) {
-            if ($this->can($ability)) {
+            if ($this->hasPermission($ability)) {
                 return true;
             }
         }
