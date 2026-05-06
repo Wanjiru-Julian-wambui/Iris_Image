@@ -47,7 +47,8 @@ function save() {
 
 function isValidEntry(val: string): boolean {
     const ipv4 = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
-    const ipv6  = /^[0-9a-fA-F:]+(\\/\d{1,3})?$/;
+    const ipv6 = /^[0-9a-fA-F:]+(?:\/\d{1,3})?$/;
+
     return ipv4.test(val) || ipv6.test(val);
 }
 </script>
