@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Shield, ShieldOff, Trash2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+    Dialog, DialogContent, DialogDescription,
+    DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import type { BreadcrumbItem } from '@/types';
+
+type Role = { id: number; name: string; label: string };
 
 const props = defineProps<{
     user: App.UserResource;
@@ -21,6 +19,8 @@ const props = defineProps<{
         data: App.ImageResource[];
         meta: { current_page: number; last_page: number; total: number };
     };
+    roles?: Role[];
+    userRoles?: Role[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -42,6 +42,27 @@ function deleteUser() {
     router.delete(`/admin/users/${props.user.id}`, {
         onFinish: () => { deleting.value = false; },
     });
+}
+
+// ── Role assignment ───────────────────────────────────────────────────────────
+const assignForm = useForm({ role: '' });
+const revokeForm = useForm({ role: '' });
+
+function assignRole(name: string) {
+    assignForm.role = name;
+    assignForm.post(`/admin/users/${props.user.id}/roles`, { preserveScroll: true });
+}
+
+function revokeRole(name: string) {
+    revokeForm.role = name;
+    revokeForm.delete(`/admin/users/${props.user.id}/roles`, {
+        preserveScroll: true,
+        data: { role: name },
+    });
+}
+
+function hasRole(name: string): boolean {
+    return !!props.userRoles?.find(r => r.name === name);
 }
 </script>
 
@@ -68,11 +89,7 @@ function deleteUser() {
                         <h2 class="text-lg font-bold">{{ user.name }}</h2>
                         <p class="text-sm text-muted-foreground">{{ user.email }}</p>
                         <div class="flex gap-2 mt-3">
-                            <Badge
-                                :class="user.is_admin
-                                    ? 'bg-[#7B2FFF]/10 text-[#7B2FFF] border-[#7B2FFF]/20'
-                                    : 'bg-muted text-muted-foreground'"
-                            >
+                            <Badge :class="user.is_admin ? 'bg-[#7B2FFF]/10 text-[#7B2FFF] border-[#7B2FFF]/20' : 'bg-muted text-muted-foreground'">
                                 {{ user.is_admin ? 'Admin' : 'User' }}
                             </Badge>
                             <Badge variant="outline">{{ user.plan?.name ?? 'Free' }}</Badge>
@@ -111,13 +128,43 @@ function deleteUser() {
                         </div>
                     </div>
 
+                    <!-- Role assignment (RBAC) -->
+                    <div v-if="roles && roles.length" class="rounded-xl border border-border bg-card p-5 space-y-3">
+                        <h3 class="font-semibold text-sm">Roles</h3>
+                        <div class="space-y-2">
+                            <div
+                                v-for="role in roles"
+                                :key="role.id"
+                                class="flex items-center justify-between"
+                            >
+                                <div class="flex items-center gap-2">
+                                    <div
+                                        class="h-2 w-2 rounded-full"
+                                        :class="hasRole(role.name) ? 'bg-emerald-400' : 'bg-muted-foreground/30'"
+                                    />
+                                    <span class="text-sm">{{ role.label }}</span>
+                                </div>
+                                <button
+                                    v-if="hasRole(role.name)"
+                                    @click="revokeRole(role.name)"
+                                    class="text-xs text-rose-400 hover:text-rose-300 transition-colors"
+                                >
+                                    Revoke
+                                </button>
+                                <button
+                                    v-else
+                                    @click="assignRole(role.name)"
+                                    class="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                                >
+                                    Assign
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Actions -->
                     <div class="space-y-2">
-                        <Button
-                            variant="outline"
-                            class="w-full gap-2"
-                            @click="toggleAdmin"
-                        >
+                        <Button variant="outline" class="w-full gap-2" @click="toggleAdmin">
                             <Shield v-if="!user.is_admin" class="h-4 w-4" />
                             <ShieldOff v-else class="h-4 w-4" />
                             {{ user.is_admin ? 'Remove admin' : 'Make admin' }}
@@ -162,12 +209,6 @@ function deleteUser() {
                                 <p class="text-white/60 text-xs">{{ image.size_human }}</p>
                             </div>
                         </Link>
-                    </div>
-
-                    <div v-if="images.meta.last_page > 1" class="flex justify-center gap-2 mt-6">
-                        <span class="text-sm text-muted-foreground">
-                            Showing {{ images.data.length }} of {{ images.meta.total }}
-                        </span>
                     </div>
                 </div>
             </div>

@@ -23,6 +23,10 @@ const sidebarNavItems: NavItem[] = [
         title: 'Appearance',
         href: editAppearance(),
     },
+    {
+        title: 'IP Allowlist',
+        href: '/settings/ip-allowlist',
+    },
 ];
 
 const { isCurrentOrParentUrl } = useCurrentUrl();

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\HasRoles;
 use App\Models\Album;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
     protected $fillable = [
         'name',
@@ -28,7 +29,7 @@ class User extends Authenticatable
         'plan_id',
         'is_admin',
         'storage_used',
-    
+        'ip_allowlist',
     ];
 
     protected $hidden = [
@@ -54,6 +55,7 @@ class User extends Authenticatable
             'is_admin'                => 'boolean',
             'storage_used'            => 'integer',
             'profile_public'          => 'boolean',
+            'ip_allowlist'            => 'array',
         ];
     }
 

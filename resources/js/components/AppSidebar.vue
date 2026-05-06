@@ -12,6 +12,7 @@ import {
     Link as LinkIcon,
     Mail,
     Shield,
+    ShieldCheck,
     Tags,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -51,8 +52,9 @@ const mainNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
-    { title: 'Admin',       href: '/admin',       icon: Shield },
-    { title: 'Invitations', href: '/invitations', icon: Mail   },
+    { title: 'Admin',       href: '/admin',       icon: Shield      },
+    { title: 'Roles',       href: '/admin/roles', icon: ShieldCheck },
+    { title: 'Invitations', href: '/invitations', icon: Mail        },
 ];
 </script>
 

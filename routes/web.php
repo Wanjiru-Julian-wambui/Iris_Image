@@ -18,6 +18,9 @@ use App\Http\Controllers\ImageReactionController;
 use App\Http\Controllers\ImageVersionController;
 use App\Http\Controllers\Profile\PublicProfileController;
 use App\Http\Controllers\EmojiController;
+use App\Http\Controllers\SamlController;
+use App\Http\Controllers\Auth\LdapLoginController;
+use App\Http\Controllers\Settings\IpAllowlistController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -51,7 +54,7 @@ Route::post('/poll/{token}/vote', [ImagePollController::class, 'vote'])->name('p
 // Public profile
 Route::get('/@{username}', [PublicProfileController::class, 'show'])->name('profile.public');
 
-// ── Emoji & Reactions ─────────────────────────────────────────────────────────
+// ── Emoji & Reactions (Public — guests can react) ─────────────────────────
 Route::get('/emojis', [EmojiController::class, 'index']);
 
 // Authenticated reaction route (for dashboard/show page)
@@ -59,6 +62,17 @@ Route::post('/images/{image}/reactions', [ImageReactionController::class, 'store
     ->name('images.reactions.store');
 Route::get('/reactions/giphy', [ImageReactionController::class, 'searchGiphy'])
     ->name('reactions.giphy');
+
+// ── SSO / LDAP (Group H) ──────────────────────────────────────────────────────
+
+// Enterprise SSO landing page (the aacotroneo/laravel-saml2 package registers
+// /saml2/{idpName}/… routes automatically via its own service provider)
+Route::get('/sso/login', [SamlController::class, 'loginPage'])->name('sso.login');
+
+// LDAP / Active Directory login — attempts LDAP bind, falls back to local auth
+Route::post('/ldap/login', [LdapLoginController::class, 'login'])
+    ->middleware('guest')
+    ->name('ldap.login');
 
 // ─── Authenticated routes ─────────────────────────────────────────────────────
 
@@ -171,6 +185,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::post('/images/bulk-download', [ImageController::class, 'bulkDownload'])->name('images.bulk-download');
+
+    // ── IP Allowlist settings (Group H) ──────────────────────────────────────
+    Route::get('/settings/ip-allowlist', [IpAllowlistController::class, 'edit'])
+        ->name('ip-allowlist.edit');
+    Route::put('/settings/ip-allowlist', [IpAllowlistController::class, 'update'])
+        ->name('ip-allowlist.update');
 
 }); // end auth + verified
 

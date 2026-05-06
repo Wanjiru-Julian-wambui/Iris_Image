@@ -309,6 +309,292 @@ php artisan test
 # Code style
 ./vendor/bin/pint
 ```
+---
+# Security & Enterprise Access Control
+
+Full implementation of role-based access control (RBAC), IP allowlisting,
+SAML 2.0 SSO and LDAP/Active Directory authentication for Iris.
+
+---
+
+## What's in this group
+
+| Area | Files |
+|---|---|
+| **RBAC — Roles & Permissions** | `Role`, `RbacService`, `RoleController`, `RoleResource`, `RoleSeeder` |
+| **IP Allowlist** | `IpAllowlistEntry`, `IpAllowlistService`, `IpAllowlistController`, `EnforceIpAllowlist` middleware |
+| **SAML 2.0 SSO** | `SamlIdentityProvider`, `SamlService`, `SamlController`, `Saml2LoginListener` |
+| **LDAP / AD** | `LdapService`, `LdapLoginController`, `config/ldap.php` |
+| **Middleware** | `EnforceIpAllowlist`, `RequirePermission` |
+| **Migrations** | roles, role_user, ip_allowlist_entries, saml_identity_providers, users (SSO columns) |
+| **Vue pages** | `Admin/Roles/Index.vue`, `Settings/IpAllowlist/Index.vue` |
+
+---
+
+## 1. RBAC — Roles & Permissions
+
+### How it works
+
+Permissions are plain strings like `images.upload` or `admin.manage_users`.
+Roles hold a JSON array of permissions. Users belong to many roles via the
+`role_user` pivot. Admin users (`is_admin = true`) bypass all permission checks.
+
+### All permissions
+
+Defined as a constant on the `Role` model:
+
+```
+images.upload        images.delete       images.download
+images.replace       images.reorder      images.bulk
+links.create         links.delete        links.view_stats
+albums.create        albums.delete       albums.manage_images
+tags.create          tags.delete
+api_keys.manage      api_credentials.manage
+webhooks.manage
+polls.create         polls.delete
+admin.access         admin.manage_users  admin.manage_roles
+admin.manage_plans   admin.email_templates
+```
+
+Use `*` as a wildcard to grant everything (used by the system `admin` role).
+
+### Checking permissions in controllers / code
+
+```php
+// Via RbacService (injected)
+$this->rbacService->check($user, 'images.upload');
+
+// Via User model helper (after adding Group H additions)
+$user->hasPermission('images.upload');
+$user->hasRole('editor');
+```
+
+### Gating routes with the middleware
+
+Register `RequirePermission` as `permission` in `app/Http/Kernel.php`:
+
+```php
+// In $routeMiddleware:
+'permission' => \App\Http\Middleware\RequirePermission::class,
+```
+
+Then use it on routes:
+
+```php
+Route::post('/images', [ImageController::class, 'store'])
+    ->middleware('permission:images.upload');
+```
+
+### System roles
+
+Three system roles are seeded and **cannot be deleted**:
+
+| Role | Slug | Description |
+|---|---|---|
+| Administrator | `admin` | Wildcard — all permissions |
+| Editor | `editor` | Full image/link/album management, no admin panel |
+| Viewer | `viewer` | Download and view stats only |
+
+---
+
+## 2. IP Allowlist
+
+Users can restrict their account to specific IP ranges. When enabled, any
+request from an unlisted IP terminates the session and redirects to login.
+
+### Enable the middleware
+
+Add `EnforceIpAllowlist` to the `web` middleware group **after** `auth` in
+`app/Http/Kernel.php`:
+
+```php
+\App\Http\Middleware\EnforceIpAllowlist::class,
+```
+
+### CIDR examples
+
+| Entry | Matches |
+|---|---|
+| `203.0.113.42/32` | Single IPv4 address |
+| `192.168.1.0/24` | 192.168.1.0 – 192.168.1.255 |
+| `10.0.0.0/8` | Entire 10.x.x.x block |
+| `2001:db8::/32` | IPv6 range |
+
+The settings page always shows the user's current IP with a one-click
+"Add this IP" button to prevent accidental lockout.
+
+---
+
+## 3. SAML 2.0 SSO
+
+Iris uses the [`aacotroneo/laravel-saml2`](https://github.com/aacotroneo/laravel-saml2)
+package. Each tenant can configure their own IdP (Okta, Azure AD, ADFS, etc.)
+via the `saml_identity_providers` database table.
+
+### Installation
+
+```bash
+composer require aacotroneo/laravel-saml2
+php artisan vendor:publish --provider="Aacotroneo\Saml2\Saml2ServiceProvider"
+```
+
+### Flow
+
+```
+User clicks "Sign in with SSO"
+  → GET /sso/login          (SamlController@loginPage — lists available IdPs)
+  → Redirect to IdP SSO URL (package handles /saml2/{idpName}/login)
+  → IdP posts assertion to  /saml2/{idpName}/acs
+  → Package fires SignedIn event
+  → Saml2LoginListener resolves IdP from database
+  → SamlService::loginFromAssertion() finds-or-creates user, calls Auth::login()
+  → Redirect to /dashboard
+```
+
+### Registering an IdP
+
+Insert a row into `saml_identity_providers` (or build an admin UI):
+
+```php
+SamlIdentityProvider::create([
+    'user_id'         => $tenantOwner->id,
+    'name'            => 'Okta',
+    'idp_name'        => 'acme-corp',           // must be URL-safe, unique
+    'entity_id'       => 'http://www.okta.com/exkXXXXX',
+    'sso_url'         => 'https://acme.okta.com/app/xxx/sso/saml',
+    'x509_cert'       => '-----BEGIN CERTIFICATE-----....',
+    'email_attribute' => 'email',
+    'name_attribute'  => 'name',
+    'active'          => true,
+]);
+```
+
+Your SP metadata URL will be: `https://yourdomain.com/saml2/{idpName}/metadata`
+
+---
+
+## 4. LDAP / Active Directory
+
+### Configuration
+
+Copy these to your `.env`:
+
+```env
+LDAP_HOST=ldap://dc.example.com
+LDAP_PORT=389
+LDAP_BASE_DN="dc=example,dc=com"
+LDAP_BIND_DN="cn=svc-iris,ou=service-accounts,dc=example,dc=com"
+LDAP_BIND_PASSWORD=your-service-account-password
+LDAP_USER_FILTER=(sAMAccountName={username})   # AD format
+# LDAP_USER_FILTER=(uid={username})            # OpenLDAP format
+```
+
+### Login endpoint
+
+```
+POST /ldap/login
+Body: { username, password }
+```
+
+The controller calls `LdapService::authenticate()`, which:
+
+1. Connects to the LDAP server
+2. Binds with the service account to search for the user
+3. Verifies the user's own password via a second bind
+4. Finds or creates a local `User` record (provisioning)
+5. Calls `Auth::login()`
+
+The LDAP login form can be added to any page — a minimal example:
+
+```vue
+<form @submit.prevent="form.post('/ldap/login')">
+    <Input v-model="form.username" placeholder="Username (sAMAccountName)" />
+    <Input v-model="form.password" type="password" placeholder="Password" />
+    <Button type="submit">Sign in with Active Directory</Button>
+</form>
+```
+
+---
+
+## 5. Kernel / middleware registration
+
+Add to `app/Http/Kernel.php`:
+
+```php
+// In $routeMiddleware:
+'permission' => \App\Http\Middleware\RequirePermission::class,
+'ip.allowlist' => \App\Http\Middleware\EnforceIpAllowlist::class,
+```
+
+Add `EnforceIpAllowlist` to the `web` group middleware stack (after `auth`):
+
+```php
+protected $middlewareGroups = [
+    'web' => [
+        // ... existing middleware ...
+        \App\Http\Middleware\EnforceIpAllowlist::class,
+    ],
+];
+```
+
+---
+
+## 6. Migrations (run in order)
+
+```bash
+php artisan migrate
+```
+
+| File | Creates |
+|---|---|
+| `000001_create_roles_table` | `roles` |
+| `000002_create_role_user_table` | `role_user` pivot |
+| `000003_create_ip_allowlist_entries_table` | `ip_allowlist_entries` |
+| `000004_create_saml_identity_providers_table` | `saml_identity_providers` |
+| `000005_add_sso_ip_columns_to_users_table` | `sso_provider`, `sso_id`, `ldap_dn`, `ip_allowlist_enabled`, `last_login_ip` on `users` |
+
+---
+
+## 7. Seeding
+
+```bash
+php artisan db:seed --class=RoleSeeder
+```
+
+Seeds the three system roles (Administrator, Editor, Viewer).
+
+---
+
+## 8. Sidebar navigation
+
+Add these entries to `AppSidebar.vue` to surface the new settings:
+
+```ts
+// In mainNavItems (authenticated users):
+{ title: 'IP Allowlist', href: '/settings/ip-allowlist', icon: Shield },
+
+// In adminNavItems (admin only):
+{ title: 'Roles', href: '/admin/roles', icon: ShieldCheck },
+```
+
+---
+
+## 9. User model additions
+
+Merge `app/Models/UserGroupHAdditions.php` into the existing `User` model:
+
+- Add `roles()`, `ipAllowlistEntries()`, `samlProviders()` relationships
+- Add `hasRole()`, `hasPermission()`, `isIpAllowed()` helpers
+- Add columns to `$fillable` and `$casts` as indicated in the file
+
+---
+
+## Composer dependencies
+
+```bash
+composer require aacotroneo/laravel-saml2   # SAML 2.0 SSO
+# php-ldap extension is required for LDAP (usually already available)
+```
 
 ---
 # Security & API
