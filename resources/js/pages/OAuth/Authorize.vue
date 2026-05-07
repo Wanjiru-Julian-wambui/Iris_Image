@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { router } from '@inertiajs/vue3';
 
 type Scope = {
     id: string;
@@ -34,11 +34,9 @@ const approve = () => {
 
 const deny = () => {
     router.delete('/oauth/authorize', {
-        data: {
-            state: props.request.state,
-            client_id: props.request.client_id,
-            auth_token: props.authToken,
-        },
+        state: props.request.state,
+        client_id: props.request.client_id,
+        auth_token: props.authToken,
     });
 };
 </script>

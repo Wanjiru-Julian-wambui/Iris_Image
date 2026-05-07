@@ -9,12 +9,26 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Inertia\Inertia;
+use Laravel\Passport\Contracts\AuthorizationViewResponse;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(AuthorizationViewResponse::class, function () {
+            return new class implements AuthorizationViewResponse {
+                public function toResponse($request)
+                {
+                    return Inertia::render('OAuth/Authorize', [
+                        'client'    => $request->attributes->get('client'),
+                        'scopes'    => $request->attributes->get('scopes'),
+                        'request'   => $request->attributes->get('authorizationRequest'),
+                        'authToken' => $request->attributes->get('authToken'),
+                    ]);
+                }
+            };
+        });
     }
 
     public function boot(): void
