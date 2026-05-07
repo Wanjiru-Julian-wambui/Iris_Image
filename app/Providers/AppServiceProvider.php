@@ -18,14 +18,18 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(AuthorizationViewResponse::class, function () {
             return new class implements AuthorizationViewResponse {
+                protected array $parameters = [];
+
+                public function withParameters(array $parameters = []): static
+                {
+                    $this->parameters = $parameters;
+
+                    return $this;
+                }
+
                 public function toResponse($request)
                 {
-                    return Inertia::render('OAuth/Authorize', [
-                        'client'    => $request->attributes->get('client'),
-                        'scopes'    => $request->attributes->get('scopes'),
-                        'request'   => $request->attributes->get('authorizationRequest'),
-                        'authToken' => $request->attributes->get('authToken'),
-                    ]);
+                    return Inertia::render('OAuth/Authorize', $this->parameters);
                 }
             };
         });
