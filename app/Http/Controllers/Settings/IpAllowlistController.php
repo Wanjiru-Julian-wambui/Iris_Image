@@ -37,10 +37,12 @@ class IpAllowlistController extends Controller
 
     private function isValidIpOrCidr(string $value): bool
     {
+        // Bare IP address
         if (filter_var($value, FILTER_VALIDATE_IP)) {
             return true;
         }
 
+        // CIDR notation
         if (str_contains($value, '/')) {
             [$ip, $prefix] = explode('/', $value, 2);
             $prefix = (int) $prefix;

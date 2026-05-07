@@ -13,7 +13,7 @@ use Inertia\Response;
 
 class RoleController extends Controller
 {
-    // ── Roles ─────────────────────────────────────────────────────────────────
+    // ── Roles CRUD ────────────────────────────────────────────────────────────
 
     public function index(): Response
     {
@@ -26,10 +26,10 @@ class RoleController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:64', 'unique:roles,name', 'alpha_dash'],
-            'label'       => ['required', 'string', 'max:128'],
-            'description' => ['nullable', 'string', 'max:255'],
-            'permissions' => ['nullable', 'array'],
+            'name'          => ['required', 'string', 'max:64', 'unique:roles,name', 'alpha_dash'],
+            'label'         => ['required', 'string', 'max:128'],
+            'description'   => ['nullable', 'string', 'max:255'],
+            'permissions'   => ['nullable', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
         ]);
 
@@ -49,9 +49,9 @@ class RoleController extends Controller
     public function update(Request $request, Role $role): RedirectResponse
     {
         $data = $request->validate([
-            'label'       => ['required', 'string', 'max:128'],
-            'description' => ['nullable', 'string', 'max:255'],
-            'permissions' => ['nullable', 'array'],
+            'label'         => ['required', 'string', 'max:128'],
+            'description'   => ['nullable', 'string', 'max:255'],
+            'permissions'   => ['nullable', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
         ]);
 
@@ -67,17 +67,23 @@ class RoleController extends Controller
 
     public function destroy(Role $role): RedirectResponse
     {
-        // Prevent deletion of built-in roles
-        if (in_array($role->name, ['admin', 'moderator', 'uploader', 'viewer'])) {
+        $builtIn = ['admin', 'moderator', 'uploader', 'viewer'];
+
+        if (in_array($role->name, $builtIn, true)) {
             return back()->with('error', 'Built-in roles cannot be deleted.');
         }
 
+        $label = $role->label;
+        $role->permissions()->detach();
+        $role->users()->detach();
         $role->delete();
 
-        return back()->with('success', "Role deleted.");
+        return back()->with('success', "Role \"{$label}\" deleted.");
     }
 
-    // ── Assign / revoke roles on users ────────────────────────────────────────
+    // ── User ↔ Role assignment ────────────────────────────────────────────────
+    // Routes expect: POST   /admin/users/{user}/roles  { role: 'name' }
+    //                DELETE /admin/users/{user}/roles  { role: 'name' }
 
     public function assignToUser(Request $request, User $user): RedirectResponse
     {
@@ -87,7 +93,7 @@ class RoleController extends Controller
 
         $user->assignRole($data['role']);
 
-        return back()->with('success', "Role assigned.");
+        return back()->with('success', 'Role assigned.');
     }
 
     public function revokeFromUser(Request $request, User $user): RedirectResponse
@@ -98,6 +104,6 @@ class RoleController extends Controller
 
         $user->removeRole($data['role']);
 
-        return back()->with('success', "Role revoked.");
+        return back()->with('success', 'Role revoked.');
     }
 }

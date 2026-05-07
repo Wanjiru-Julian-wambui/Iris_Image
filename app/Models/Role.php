@@ -2,18 +2,25 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Role extends Model
 {
-    protected $fillable = ['name', 'label', 'description'];
+    use HasFactory;
+
+    protected $fillable = [
+        'name',         // machine slug e.g. "content_editor"
+        'label',        // display name e.g. "Content Editor"
+        'description',
+    ];
 
     // ── Relationships ─────────────────────────────────────────────────────────
 
     public function permissions(): BelongsToMany
     {
-        return $this->belongsToMany(Permission::class, 'role_permission');
+        return $this->belongsToMany(Permission::class, 'permission_role');
     }
 
     public function users(): BelongsToMany
@@ -24,31 +31,10 @@ class Role extends Model
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Grant a permission (by name or model) to this role.
+     * Does this role grant the named permission?
      */
-    public function grantPermission(string|Permission $permission): void
+    public function hasPermission(string $ability): bool
     {
-        $permission = $permission instanceof Permission
-            ? $permission
-            : Permission::whereName($permission)->firstOrFail();
-
-        $this->permissions()->syncWithoutDetaching($permission);
-    }
-
-    /**
-     * Revoke a permission from this role.
-     */
-    public function revokePermission(string|Permission $permission): void
-    {
-        $permission = $permission instanceof Permission
-            ? $permission
-            : Permission::whereName($permission)->firstOrFail();
-
-        $this->permissions()->detach($permission);
-    }
-
-    public function hasPermission(string $name): bool
-    {
-        return $this->permissions->contains('name', $name);
+        return $this->permissions->contains('name', $ability);
     }
 }

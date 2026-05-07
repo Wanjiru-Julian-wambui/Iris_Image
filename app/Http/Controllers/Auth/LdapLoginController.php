@@ -16,7 +16,9 @@ use Throwable;
 class LdapLoginController extends Controller
 {
     /**
-     * Attempt LDAP authentication, falling back to local auth if LDAP
+     * POST /ldap/login
+     *
+     * Attempts LDAP bind first, falls back to local Eloquent auth if LDAP
      * is unreachable or the user is not found in the directory.
      */
     public function login(Request $request): RedirectResponse
@@ -26,7 +28,7 @@ class LdapLoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        // ── 1. Attempt LDAP bind ──────────────────────────────────────────
+        // ── 1. Attempt LDAP bind ──────────────────────────────────────────────
         try {
             $ldapUser = LdapUser::where('mail', '=', $request->email)->first();
 
@@ -38,10 +40,10 @@ class LdapLoginController extends Controller
                 return redirect()->intended(route('dashboard'));
             }
         } catch (Throwable) {
-            // LDAP unavailable — fall through to local auth below
+            // LDAP unavailable — fall through to local auth
         }
 
-        // ── 2. Fall back to local Eloquent auth ───────────────────────────
+        // ── 2. Fall back to local Eloquent auth ───────────────────────────────
         if (Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             $request->session()->regenerate();
 

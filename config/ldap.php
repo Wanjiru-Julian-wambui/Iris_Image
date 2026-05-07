@@ -4,42 +4,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Default LDAP Connection Name
+    | LDAP / Active Directory Connection
     |--------------------------------------------------------------------------
-    |
-    | Here you may specify which of the LDAP connections below you wish
-    | to use as your default connection for all LDAP operations. Of
-    | course you may add as many connections you'd like below.
-    |
+    | Configure via .env — leave LDAP_HOSTS empty to disable LDAP entirely.
+    | Uses the directorytree/ldaprecord-laravel package.
+    |--------------------------------------------------------------------------
     */
 
     'default' => env('LDAP_CONNECTION', 'default'),
 
-    /*
-    |--------------------------------------------------------------------------
-    | LDAP Connections
-    |--------------------------------------------------------------------------
-    |
-    | Below you may configure each LDAP connection your application requires
-    | access to. Be sure to include a valid base DN - otherwise you may
-    | not receive any results when performing LDAP search operations.
-    |
-    */
-
     'connections' => [
 
         'default' => [
-            'hosts' => [env('LDAP_HOST', '127.0.0.1')],
-            'username' => env('LDAP_USERNAME', 'cn=user,dc=local,dc=com'),
-            'password' => env('LDAP_PASSWORD', 'secret'),
-            'port' => env('LDAP_PORT', 389),
-            'base_dn' => env('LDAP_BASE_DN', 'dc=local,dc=com'),
-            'timeout' => env('LDAP_TIMEOUT', 5),
-            'use_tls' => env('LDAP_TLS', false),
-            'use_starttls' => env('LDAP_STARTTLS', false),
-            'use_sasl' => env('LDAP_SASL', false),
-            'sasl_options' => [
-                // 'mech' => 'GSSAPI',
+            'hosts'            => [env('LDAP_HOST', '127.0.0.1')],
+            'username'         => env('LDAP_USERNAME', ''),       // service account DN
+            'password'         => env('LDAP_PASSWORD', ''),
+            'port'             => (int) env('LDAP_PORT', 389),
+            'base_dn'          => env('LDAP_BASE_DN', ''),
+            'timeout'          => 5,
+            'use_ssl'          => env('LDAP_SSL', false),         // port 636
+            'use_tls'          => env('LDAP_TLS', false),
+            'use_sasl'         => false,
+            'options'          => [
+                LDAP_OPT_X_TLS_REQUIRE_CERT => LDAP_OPT_X_TLS_NEVER,
             ],
         ],
 
@@ -47,35 +34,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | LDAP Logging
+    | .env additions (copy these to your .env file)
     |--------------------------------------------------------------------------
     |
-    | When LDAP logging is enabled, all LDAP search and authentication
-    | operations are logged using the default application logging
-    | driver. This can assist in debugging issues and more.
+    | LDAP_CONNECTION=default
+    | LDAP_HOST=your-dc.example.com
+    | LDAP_USERNAME="cn=svc-iris,ou=service-accounts,dc=example,dc=com"
+    | LDAP_PASSWORD=your-service-account-password
+    | LDAP_PORT=389
+    | LDAP_BASE_DN="dc=example,dc=com"
+    | LDAP_SSL=false
+    | LDAP_TLS=false
     |
     */
-
-    'logging' => [
-        'enabled' => env('LDAP_LOGGING', true),
-        'channel' => env('LOG_CHANNEL', 'stack'),
-        'level' => env('LOG_LEVEL', 'info'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | LDAP Cache
-    |--------------------------------------------------------------------------
-    |
-    | LDAP caching enables the ability of caching search results using the
-    | query builder. This is great for running expensive operations that
-    | may take many seconds to complete, such as a pagination request.
-    |
-    */
-
-    'cache' => [
-        'enabled' => env('LDAP_CACHE', false),
-        'driver' => env('CACHE_DRIVER', 'file'),
-    ],
 
 ];
