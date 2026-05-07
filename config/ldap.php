@@ -22,8 +22,6 @@ return [
             'port'             => (int) env('LDAP_PORT', 389),
             'base_dn'          => env('LDAP_BASE_DN', ''),
             'timeout'          => 5,
-            'ssl'              => env('LDAP_SSL', false),          // port 636
-            'tls'              => env('LDAP_TLS', false),
             'use_sasl'         => false,
             'options'          => [
                 LDAP_OPT_X_TLS_REQUIRE_CERT => LDAP_OPT_X_TLS_NEVER,
