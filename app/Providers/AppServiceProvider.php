@@ -29,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
 
                 public function toResponse($request)
                 {
+                    dd($this->parameters); // remove after checking
                     return Inertia::render('OAuth/Authorize', $this->parameters)->toResponse($request);
                 }
             };

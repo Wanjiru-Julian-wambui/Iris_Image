@@ -44,6 +44,9 @@ const deny = () => {
 <template>
     <AppLayout :breadcrumbs="[{ title: 'Authorize', href: '/oauth/authorize' }]">
         <div class="flex items-center justify-center p-8">
+            <!-- Temporary debug output — remove after checking -->
+            <pre class="mb-4 text-xs bg-gray-100 p-4 rounded w-full max-w-md overflow-auto">{{ JSON.stringify($props, null, 2) }}</pre>
+
             <div class="bg-white shadow rounded-lg p-8 max-w-md w-full">
                 <h1 class="text-xl font-semibold text-gray-800 mb-2">
                     Authorize {{ client.name }}
